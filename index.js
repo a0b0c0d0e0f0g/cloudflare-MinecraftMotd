@@ -24,132 +24,141 @@ async function handleInfoRequest(serverIP) {
 
 async function handleImageRequest(serverIP) {
   const apiUrl = `https://api.mcstatus.io/v2/status/java/${encodeURIComponent(serverIP)}`;
+  // 随机背景图
   const backgroundImage = `https://other.api.yilx.cc/api/moe?t=${Date.now()}`; 
 
   try {
     const res = await fetch(apiUrl, { cf: { cacheTtl: 60 } });
     const data = await res.json();
     const isOnline = data.online;
-    const motdHtml = isOnline ? (data.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
-
-    let playerHtml = "";
-    let playerCount = 0;
-    if (isOnline && data.players.list?.length > 0) {
-      const list = data.players.list.slice(0, 6);
-      playerCount = list.length;
-      playerHtml = list.map(p => `<div style="height:24px; color:#ffffff; font-weight:500;">• ${p.name_clean}</div>`).join("");
-    } else {
-      playerHtml = '<div style="color:#ffffff; opacity:0.5">No players online</div>';
-      playerCount = 1;
+    
+    // 动态计算高度
+    let cardHeight = 180;
+    let playersList = '';
+    if (isOnline && data.players.list && data.players.list.length > 0) {
+        const pList = data.players.list.slice(0, 8);
+        cardHeight += (Math.ceil(pList.length / 4) * 55);
+        playersList = pList.map(p => `
+            <g transform="translate(0,0)">
+                <image href="https://mc-heads.net/avatar/${p.uuid}/40" x="0" y="0" width="36" height="36" clip-path="url(#avatar-mask)"/>
+                <text x="0" y="48" font-size="10" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto" text-anchor="start" opacity="0.8">${p.name_clean}</text>
+            </g>
+        `).join('');
     }
 
-    const cardHeight = 280 + (playerCount * 24);
-    const statusColor = isOnline ? '#34C759' : '#FF3B30';
-    const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
+    // 核心：iOS 连续曲率路径 (Squircle)
+    // 使用路径绘制比 rx 属性更接近 iOS 视觉
+    const iosCardPath = `M 0,50 C 0,0 0,0 50,0 H 400 C 450,0 450,0 450,50 V ${cardHeight-50} C 450,${cardHeight} 450,${cardHeight} 400,${cardHeight} H 50 C 0,${cardHeight} 0,${cardHeight} 0,${cardHeight-50} Z`;
+    const iosAvatarPath = `M 0,12 C 0,0 0,0 12,0 H 24 C 36,0 36,0 36,12 V 24 C 36,36 36,36 24,36 H 12 C 0,36 0,36 0,24 Z`;
 
-    const svg = `<svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
+    const svg = `
+    <svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="rect-mask"><rect width="450" height="${cardHeight}" rx="45" ry="45" /></clipPath>
-        <clipPath id="icon-mask"><rect width="64" height="64" rx="16" ry="16" /></clipPath>
-        <clipPath id="tag-mask"><rect width="100" height="28" rx="14" ry="14" /></clipPath>
+        <clipPath id="card-mask"><path d="${iosCardPath}" /></clipPath>
+        <clipPath id="avatar-mask"><path d="${iosAvatarPath}" /></clipPath>
+        <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#000;stop-opacity:0.6" />
+          <stop offset="100%" style="stop-color:#000;stop-opacity:0.8" />
+        </linearGradient>
       </defs>
-      <g clip-path="url(#rect-mask)">
+      
+      <g clip-path="url(#card-mask)">
         <image href="${backgroundImage}" width="450" height="${cardHeight}" preserveAspectRatio="xMidYMid slice" />
-        <rect width="450" height="${cardHeight}" fill="#000" fill-opacity="0.75" />
+        <rect width="450" height="${cardHeight}" fill="url(#grad)" />
+        
+        <image href="${data.icon || 'https://mc-heads.net/avatar/steve/64'}" x="30" y="30" width="64" height="64" clip-path="url(#card-mask)" />
+        
+        <text x="110" y="55" font-family="-apple-system,Helvetica,Arial" font-size="22" font-weight="600" fill="#ffffff">${serverIP}</text>
+        <circle cx="115" cy="78" r="5" fill="${isOnline ? '#34C759' : '#FF3B30'}" />
+        <text x="130" y="83" font-family="-apple-system,Helvetica" font-size="14" fill="#ffffff" opacity="0.8">${isOnline ? '服务器在线' : '服务器离线'}</text>
+        <text x="30" y="130" font-family="-apple-system,Helvetica" font-size="16" fill="#ffffff" font-weight="500">${data.players?.online || 0} / ${data.players?.max || 0} 玩家在线</text>
+        
+        <g transform="translate(30, 155)">
+            ${isOnline ? playersList : ''}
+        </g>
       </g>
-      <g transform="translate(35, 35)">
-        <image href="${icon}" width="64" height="64" clip-path="url(#icon-mask)" />
-      </g>
-      <text x="115" y="62" font-family="-apple-system, sans-serif" font-size="22" fill="#fff" font-weight="800">${serverIP}</text>
-      <text x="115" y="86" font-family="-apple-system, sans-serif" font-size="13" fill="#98989d">${version}</text>
-      
-      <g transform="translate(315, 42)">
-        <rect width="100" height="28" fill="#ffffff" fill-opacity="0.12" clip-path="url(#tag-mask)" />
-        <text x="50" y="19" font-family="-apple-system, sans-serif" font-size="12" font-weight="800" fill="${statusColor}" text-anchor="middle">
-          ${isOnline ? data.players.online + ' / ' + data.players.max : 'OFFLINE'}
-        </text>
-      </g>
-
-      <foreignObject x="35" y="125" width="380" height="60">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="color:#fff; font-size:16px; font-family:sans-serif; line-height:1.4;">${motdHtml}</div>
-      </foreignObject>
-      
-      <text x="35" y="215" font-family="-apple-system, sans-serif" font-size="11" fill="#64D2FF" font-weight="800" style="letter-spacing:1px">ONLINE PLAYERS</text>
-      <foreignObject x="35" y="225" width="380" height="150">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:14px; font-family:sans-serif; color:#fff; line-height:1.7;">${playerHtml}</div>
-      </foreignObject>
     </svg>`;
-    
-    return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
+
+    return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=60" } });
   } catch (e) {
-    return new Response("Error", { status: 500 });
+    return new Response("<svg><text y='20'>Error generating card</text></svg>", { headers: { "Content-Type": "image/svg+xml" } });
   }
 }
 
 const htmlTemplate = `
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MC Status</title>
+    <title>MC Status Card - iOS Style</title>
     <style>
-        body { margin:0; padding:20px; background:#000; color:#fff; font-family:-apple-system,sans-serif; display:flex; flex-direction:column; align-items:center; }
-        .wrap { width:100%; max-width:420px; }
-        .title { font-size:32px; font-weight:800; margin:30px 0 20px; letter-spacing:-1px; }
-        textarea { 
-            width:100%; height:60px; padding:18px; border-radius:18px; border:none; background:#1c1c1e; 
-            color:#fff; font-size:17px; outline:none; box-sizing:border-box; margin-bottom:12px;
+        :root { --ios-radius: 40px; --inner-radius: 18px; }
+        body { 
+            margin: 0; padding: 0; min-height: 100vh;
+            background: #000; color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            display: flex; align-items: center; justify-content: center;
         }
-        .btn { 
-            width:100%; height:55px; border-radius:18px; border:none; font-size:17px; font-weight:700;
-            cursor:pointer; transition:0.2s; display:flex; align-items:center; justify-content:center; margin-bottom:12px;
+        .container {
+            width: 90%; max-width: 500px; padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border-radius: var(--ios-radius);
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            text-align: center;
         }
-        .btn-main { background:#fff; color:#000; }
-        .btn-dl { background:#2c2c2e; color:#0A84FF; display:none; }
-        .btn:active { transform:scale(0.97); opacity:0.8; }
-        #res img { width:100%; border-radius:40px; margin-top:20px; box-shadow:0 20px 50px rgba(0,0,0,0.6); }
-        #info-box { display:none; background:#1c1c1e; border-radius:18px; padding:20px; margin-top:20px; width:100%; box-sizing:border-box; }
-        .label { font-size:12px; font-weight:700; color:#8e8e93; margin-bottom:8px; }
+        h2 { font-weight: 600; letter-spacing: -0.5px; margin-bottom: 30px; }
+        input, textarea, button {
+            width: 100%; box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.08);
+            border: none; color: #fff; padding: 15px;
+            margin-bottom: 15px; font-size: 16px;
+            border-radius: var(--inner-radius);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        input:focus { background: rgba(255, 255, 255, 0.15); outline: none; }
+        button { 
+            background: #fff; color: #000; font-weight: 600; cursor: pointer;
+            margin-top: 10px;
+        }
+        button:active { transform: scale(0.97); opacity: 0.8; }
+        #res img { 
+            width: 100%; border-radius: var(--ios-radius); 
+            margin-top: 25px; box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+        }
+        #full-motd-box {
+            margin-top: 25px; padding: 15px; text-align: left;
+            background: rgba(0,0,0,0.2); border-radius: var(--inner-radius);
+            display: none; font-size: 13px; line-height: 1.5;
+        }
+        .footer { margin-top: 30px; font-size: 12px; opacity: 0.4; }
     </style>
 </head>
 <body>
-    <div class="wrap">
-        <div class="title">MC Status</div>
-        <textarea id="ip" placeholder="输入服务器 IP..."></textarea>
-        <button class="btn btn-main" onclick="gen()">生成预览卡片</button>
-        <button id="dl" class="btn btn-dl" onclick="save()">下载保存卡片</button>
+    <div class="container">
+        <h2>MC 状态卡片生成</h2>
+        <input type="text" id="ip" placeholder="输入服务器 IP (例如: play.hypixel.net)">
+        <button onclick="gen()">生成卡片</button>
         <div id="res"></div>
-        <div id="info-box"><div class="label">FULL MOTD</div><div id="motd"></div></div>
+        <div id="full-motd-box" id="full-motd-content"></div>
+        <div class="footer">DESIGNED FOR IOS VISUAL EXPERIENCE</div>
     </div>
     <script>
-        let curUrl = '';
         async function gen() {
             const ip = document.getElementById('ip').value.trim();
             if(!ip) return;
-            curUrl = window.location.origin + '?server=' + encodeURIComponent(ip);
-            const res = document.getElementById('res');
-            const dl = document.getElementById('dl');
-            res.innerHTML = '<p style="text-align:center;opacity:0.5">Fetching...</p>';
+            const resDiv = document.getElementById('res');
+            resDiv.innerHTML = '<p style="opacity:0.5;">正在获取数据...</p>';
             
+            const imageUrl = window.location.origin + '?server=' + encodeURIComponent(ip);
             const img = new Image();
-            img.onload = () => { res.innerHTML = ''; res.appendChild(img); dl.style.display = 'flex'; };
-            img.src = curUrl;
-
-            const info = await fetch(window.location.origin + '?type=info&server=' + encodeURIComponent(ip)).then(r=>r.json());
-            if(info.online) {
-                document.getElementById('info-box').style.display = 'block';
-                document.getElementById('motd').innerHTML = info.motd;
-            }
-        }
-        async function save() {
-            const r = await fetch(curUrl);
-            const b = await r.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(b);
-            a.download = 'mc-card.svg';
-            a.click();
+            img.onload = () => { resDiv.innerHTML = ''; resDiv.appendChild(img); };
+            img.src = imageUrl;
         }
     </script>
 </body>
-</html>`;
+</html>
+`;
