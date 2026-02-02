@@ -45,7 +45,7 @@ async function handleImageRequest(serverIP) {
 
     const cardHeight = 280 + (playerCount * 24);
     const statusColor = isOnline ? '#34C759' : '#FF3B30';
-    const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
+    const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
 
     const svg = `<svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -89,9 +89,9 @@ const htmlTemplate = `
     <style>
         body { margin:0; padding:20px 0; background:#000; color:#fff; font-family:-apple-system,sans-serif; display:flex; flex-direction:column; align-items:center; }
         .wrap { 
-            width: 92%;           /* 修改此处：左右预留 4% 空间 */
+            width: 92%;           /* 修改此处：左右预留 4% 的空隙 */
             max-width: 440px; 
-            margin: 0 auto;       /* 居中 */
+            margin: 0 auto;       /* 确保居中 */
         }
         .title { font-size:32px; font-weight:800; margin:40px 0 20px; letter-spacing:-1px; }
         textarea { 
@@ -134,7 +134,7 @@ const htmlTemplate = `
             if(!ip) return;
             const resDiv = document.getElementById('res');
             const fullMotdBox = document.getElementById('full-motd-box');
-            resDiv.innerHTML = '<p style="opacity:0.6; font-size:14px; text-align:center;">正在连接...</p>';
+            resDiv.innerHTML = '<p style=\"opacity:0.6; font-size:14px; text-align:center;\">正在连接...</p>';
             fullMotdBox.style.display = 'none';
 
             const imageUrl = window.location.origin + '?server=' + encodeURIComponent(ip);
@@ -154,4 +154,4 @@ const htmlTemplate = `
         }
     </script>
 </body>
-</html>`;
+</html>
