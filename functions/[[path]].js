@@ -20,53 +20,44 @@ async function handleImageRequest(serverIP) {
     const data = await res.json();
     const isOnline = data.status === "success" && data.online;
     
-    // 玩家数据处理
     const playersNow = isOnline ? data.players.now : 0;
     const playersMax = isOnline ? data.players.max : 0;
-    const playerList = (isOnline && data.players.list) ? data.players.list.slice(0, 10) : []; // 仅显示前10个
-    
     const cleanMotd = (isOnline ? data.motd : "Server Offline").replace(/§[0-9a-fk-or]/gi, "").substring(0, 45);
-    const iconData = (isOnline && data.favicon) ? data.favicon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5AgKDA8XAzZ9dwAAAYZJREFUeNrt279Lw1AUxvHvpS3+ARZpBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXBycXByfXv8AAtXvB5vPsh0AAAAASUVORK5CYII=";
+    const iconData = (isOnline && data.favicon) ? data.favicon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve97973vve9773vveu+9773vve+7773vve+967vfffvve++73vve+9777vve+99333f89733vfee997333v+967nvve++5733vve+97733fve+9733vfd9973vv+977rvee99733vve+9773vve99733vfe99733ve9973vvve99733vve+9733vve9973vvve9773vve+9773vve+9733vve+9773vve+9773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve9973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
 
-    // 根据是否有玩家列表动态计算高度
-    const hasPlayers = playerList.length > 0;
-    const svgHeight = hasPlayers ? 160 : 120;
-
-    let playerNames = hasPlayers ? "Online: " + playerList.join(", ") : "No players online or list hidden";
-    if (playerList.length >= 10) playerNames += "...";
-
-    const svg = `<svg width="450" height="${svgHeight}" viewBox="0 0 450 ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="450" height="${svgHeight}" rx="14" fill="#1a1b26" stroke="#414868" stroke-width="2"/>
-      <defs><clipPath id="round-icon"><rect x="20" y="28" width="64" height="64" rx="10"/></clipPath></defs>
-      <image x="20" y="28" width="64" height="64" href="${iconData}" clip-path="url(#round-icon)"/>
-      <circle cx="102" cy="36" r="5" fill="${isOnline ? "#4ade80" : "#f87171"}"/>
-      <text x="115" y="42" font-family="sans-serif" font-weight="bold" font-size="18" fill="#7aa2f7">${serverIP}</text>
-      <text x="100" y="70" font-family="monospace" font-size="14" fill="#c0caf5">${cleanMotd}</text>
-      <text x="100" y="98" font-family="sans-serif" font-size="12" fill="#565f89">PLAYERS: ${playersNow} / ${playersMax}</text>
-      ${hasPlayers ? `<text x="100" y="130" font-family="sans-serif" font-size="11" fill="#9ece6a">${playerNames}</text>` : ""}
+    const svg = `
+    <svg width="400" height="100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" rx="10" fill="#1e1e2e"/>
+      <image href="${iconData}" x="20" y="18" width="64" height="64" />
+      <text x="100" y="40" font-family="Arial" font-size="18" fill="#cdd6f4" font-weight="bold">${serverIP}</text>
+      <text x="100" y="65" font-family="Arial" font-size="14" fill="#a6adc8">${cleanMotd}</text>
+      <circle cx="105" cy="82" r="4" fill="${isOnline ? '#a6e3a1' : '#f38ba8'}"/>
+      <text x="115" y="86" font-family="Arial" font-size="12" fill="#bac2de">${isOnline ? `Online | ${playersNow}/${playersMax}` : 'Offline'}</text>
     </svg>`;
-    
-    return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=60" } });
-  } catch (e) { return new Response("Error", { status: 500 }); }
+
+    return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=60" } });
+  } catch (e) {
+    return new Response("Error", { status: 500 });
+  }
 }
 
 const htmlTemplate = `
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>MC 服务器状态生成器</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft 服务器状态生成器</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #1a1b26; color: #c0caf5; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .container-box { background: #24283b; border-radius: 20px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); width: 100%; max-width: 550px; }
-        .input-group { background: #1f2335; border-radius: 12px; padding: 5px; border: 1px solid #414868; }
-        input { background: transparent !important; border: none !important; color: white !important; box-shadow: none !important; }
-        .btn-primary { background: #7aa2f7; border: none; border-radius: 10px; padding: 10px 25px; transition: 0.3s; }
-        .btn-primary:hover { background: #89b4fa; transform: translateY(-2px); }
-        .preview-area { background: #16161e; border-radius: 15px; margin-top: 30px; padding: 20px; min-height: 180px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        code { color: #bb9af7; }
-        .code-box { background: #1a1b26; padding: 15px; border-radius: 10px; margin-top: 20px; display: none; border-left: 4px solid #7aa2f7; }
+        body { background-color: #1a1b26; color: #a9b1d6; padding-top: 50px; }
+        .container-box { max-width: 600px; margin: 0 auto; background: #24283b; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .preview-area { background: #1a1b26; border-radius: 10px; padding: 20px; text-align: center; margin-top: 20px; }
+        .code-box { background: #16161e; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px; margin-top: 20px; word-break: break-all; display: none; }
+        .btn-primary { background-color: #7aa2f7; border: none; }
+        .btn-primary:hover { background-color: #89ddff; }
+        .form-control { background: #1a1b26; border: 1px solid #414868; color: #c0caf5; }
+        .form-control:focus { background: #24283b; color: #c0caf5; border-color: #7aa2f7; }
     </style>
 </head>
 <body>
@@ -76,24 +67,21 @@ const htmlTemplate = `
             <input type="text" id="ipInput" class="form-control" placeholder="输入服务器地址 (如: play.hypixel.net)">
             <button class="btn btn-primary" onclick="generate()">确定</button>
         </div>
-
-        <div class="preview-area" id="previewArea">
-            <span class="text-muted">等待生成预览...</span>
-        </div>
-
+        <div class="preview-area" id="previewArea"><span class="text-muted">等待生成预览...</span></div>
         <div id="codeBox" class="code-box">
             <label class="small text-muted mb-2 d-block">Markdown 代码:</label>
             <code id="mdLink"></code>
         </div>
     </div>
-
     <script>
         function generate() {
             const ip = document.getElementById('ipInput').value.trim();
             if (!ip) return alert("请输入服务器 IP");
             
-            const baseUrl = window.location.origin + window.location.pathname;
-            const fullUrl = baseUrl + '?server=' + ip + '&t=' + Date.now();
+            // 核心修改：使用当前页面的 host 动态生成
+            const protocol = window.location.protocol;
+            const host = window.location.host;
+            const fullUrl = protocol + "//" + host + "/?server=" + encodeURIComponent(ip) + "&t=" + Date.now();
             
             document.getElementById('previewArea').innerHTML = \`
                 <p class="small text-muted mb-2">预览：</p>
@@ -101,9 +89,8 @@ const htmlTemplate = `
             \`;
             
             document.getElementById('codeBox').style.display = 'block';
-            document.getElementById('mdLink').innerText = \`![MC Status](\${baseUrl}?server=\${ip})\`;
+            document.getElementById('mdLink').innerText = \`![MC Server Status](\${fullUrl.split('&t=')[0]}) \`;
         }
     </script>
 </body>
-</html>
-`;
+</html>`;
