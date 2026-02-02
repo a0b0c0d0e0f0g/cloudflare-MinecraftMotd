@@ -89,9 +89,9 @@ const htmlTemplate = `
     <style>
         body { margin:0; padding:20px 0; background:#000; color:#fff; font-family:-apple-system,sans-serif; display:flex; flex-direction:column; align-items:center; }
         .wrap { 
-            width: 92%;           /* 修改此处：左右预留 4% 的空隙 */
+            width: 92%;
             max-width: 440px; 
-            margin: 0 auto;       /* 确保居中 */
+            margin: 0 auto;
         }
         .title { font-size:32px; font-weight:800; margin:40px 0 20px; letter-spacing:-1px; }
         textarea { 
@@ -134,7 +134,7 @@ const htmlTemplate = `
             if(!ip) return;
             const resDiv = document.getElementById('res');
             const fullMotdBox = document.getElementById('full-motd-box');
-            resDiv.innerHTML = '<p style=\"opacity:0.6; font-size:14px; text-align:center;\">正在连接...</p>';
+            resDiv.innerHTML = '<p style="opacity:0.6; font-size:14px; text-align:center;">正在连接...</p>';
             fullMotdBox.style.display = 'none';
 
             const imageUrl = window.location.origin + '?server=' + encodeURIComponent(ip);
@@ -154,4 +154,4 @@ const htmlTemplate = `
         }
     </script>
 </body>
-</html>
+</html>`;
