@@ -35,17 +35,18 @@ async function handleImageRequest(serverIP) {
     let playerHtml = "";
     let playerCount = 0;
     if (isOnline && data.players.list?.length > 0) {
-      const list = data.players.list.slice(0, 6);
+      const list = data.players.list.slice(0, 8); // 保持你原本的 8 名玩家
       playerCount = list.length;
-      playerHtml = list.map(p => `<div style="height:24px; color:#ffffff; font-weight:500;">• ${p.name_clean}</div>`).join("");
+      playerHtml = list.map(p => `<div style="height:22px; color:#ffffff;">${p.name_html || p.name_clean}</div>`).join("");
     } else {
       playerHtml = '<div style="color:#ffffff; opacity:0.5">No players online</div>';
       playerCount = 1;
     }
 
-    const cardHeight = 280 + (playerCount * 24);
-    const statusColor = isOnline ? '#34C759' : '#FF3B30';
+    const playerAreaHeight = Math.max(playerCount * 24, 30);
+    const cardHeight = 230 + playerAreaHeight;
     const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
+    const statusColor = isOnline ? '#a6e3a1' : '#f38ba8'; // 保持你原本的颜色代码
 
     const svg = `<svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -57,18 +58,15 @@ async function handleImageRequest(serverIP) {
       </g>
       <image href="${icon}" x="35" y="35" width="64" height="64" />
       <text x="115" y="75" font-family="sans-serif" font-size="24" fill="#fff" font-weight="bold">${serverIP}</text>
-      
       <rect x="315" y="45" width="100" height="30" rx="15" fill="#ffffff" fill-opacity="0.1" />
       <text x="365" y="65" font-family="sans-serif" font-size="14" fill="${statusColor}" text-anchor="middle" font-weight="bold">
         ${isOnline ? data.players.online + ' / ' + data.players.max : 'OFFLINE'}
       </text>
-
       <foreignObject x="35" y="120" width="380" height="80">
         <div xmlns="http://www.w3.org/1999/xhtml" style="color:#fff; font-size:16px; font-family:sans-serif;">${motdHtml}</div>
       </foreignObject>
-      
-      <text x="35" y="230" font-family="sans-serif" font-size="12" fill="#aaa" font-weight="bold">ONLINE PLAYERS</text>
-      <foreignObject x="35" y="240" width="380" height="150">
+      <text x="35" y="210" font-family="sans-serif" font-size="12" fill="#aaa" font-weight="bold">ONLINE PLAYERS</text>
+      <foreignObject x="35" y="220" width="380" height="${playerAreaHeight}">
         <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:14px; font-family:sans-serif; color:#fff; line-height:1.6;">${playerHtml}</div>
       </foreignObject>
     </svg>`;
@@ -89,7 +87,7 @@ const htmlTemplate = `
     <style>
         body { margin:0; padding:20px 0; background:#000; color:#fff; font-family:-apple-system,sans-serif; display:flex; flex-direction:column; align-items:center; }
         .wrap { 
-            width: 92%;
+            width: 92%; /* 关键修改：实现手机端左右留空 */
             max-width: 440px; 
             margin: 0 auto;
         }
