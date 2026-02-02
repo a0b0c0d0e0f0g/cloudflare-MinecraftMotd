@@ -5,9 +5,22 @@ export default {
     if (!serverIP) {
       return new Response(htmlTemplate, { headers: { "Content-Type": "text/html;charset=UTF-8" } });
     }
+    if (url.searchParams.get("type") === "info") {
+        return handleInfoRequest(serverIP);
+    }
     return handleImageRequest(serverIP);
   }
 };
+
+async function handleInfoRequest(serverIP) {
+    const apiUrl = `https://api.mcstatus.io/v2/status/java/${encodeURIComponent(serverIP)}`;
+    const res = await fetch(apiUrl);
+    const data = await res.json();
+    return new Response(JSON.stringify({ 
+        motd: data.motd?.html || "No MOTD",
+        online: data.online 
+    }), { headers: { "Content-Type": "application/json" } });
+}
 
 async function handleImageRequest(serverIP) {
   const apiUrl = `https://api.mcstatus.io/v2/status/java/${encodeURIComponent(serverIP)}`;
@@ -18,44 +31,75 @@ async function handleImageRequest(serverIP) {
     const data = await res.json();
     const isOnline = data.online;
     const motdHtml = isOnline ? (data.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
-    const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
-    const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
 
     let playerHtml = "";
     let playerCount = 0;
     if (isOnline && data.players.list?.length > 0) {
-      const list = data.players.list.slice(0, 6);
+      const list = data.players.list.slice(0, 8);
       playerCount = list.length;
-      playerHtml = list.map(p => `<div style="height:22px; color:#ffffff;">${p.name_clean}</div>`).join("");
+      playerHtml = list.map(p => `<div style="height:22px; color:#ffffff;">${p.name_html || p.name_clean}</div>`).join("");
     } else {
       playerHtml = '<div style="color:#ffffff; opacity:0.5">No players online</div>';
       playerCount = 1;
     }
 
-    const cardHeight = 240 + Math.max(playerCount * 24, 30);
-    const statusColor = isOnline ? '#34C759' : '#FF3B30';
+    const playerAreaHeight = Math.max(playerCount * 24, 30);
+    const cardHeight = 230 + playerAreaHeight;
+    const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
+    const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
+    const statusColor = isOnline ? '#a6e3a1' : '#f38ba8';
 
     const svg = `<svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
-      <defs><clipPath id="m"><rect width="64" height="64" rx="16"/></clipPath><clipPath id="c"><rect width="450" height="${cardHeight}" rx="45"/></clipPath></defs>
-      <g clip-path="url(#c)">
+      <defs>
+        <style>
+          .shadow { text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
+          .motd-container div { 
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; white-space: pre-wrap; word-break: break-all; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,1); font-family: -apple-system, Arial; line-height: 1.4;
+          }
+          .player-container div { display: block; font-family: -apple-system, Arial; text-shadow: 1px 1px 2px rgba(0,0,0,1); }
+        </style>
+        <clipPath id="iphone-mask">
+          <rect width="64" height="64" rx="16" />
+        </clipPath>
+        <clipPath id="card-mask">
+          <rect width="450" height="${cardHeight}" rx="45" />
+        </clipPath>
+      </defs>
+      
+      <g clip-path="url(#card-mask)">
         <image href="${backgroundImage}" width="450" height="${cardHeight}" preserveAspectRatio="xMidYMid slice" />
-        <rect width="450" height="${cardHeight}" fill="#000" fill-opacity="0.75" />
+        <rect width="450" height="${cardHeight}" fill="#11111b" fill-opacity="0.75" />
       </g>
-      <g transform="translate(35, 35)"><image href="${icon}" width="64" height="64" clip-path="url(#m)"/></g>
-      <text x="115" y="60" font-family="Arial" font-size="22" fill="#fff" font-weight="bold">${serverIP}</text>
-      <text x="115" y="85" font-family="Arial" font-size="13" fill="#98989d">${version}</text>
-      <rect x="310" y="40" width="105" height="28" rx="14" fill="#000" fill-opacity="0.5"/>
-      <text x="362" y="58" font-family="Arial" font-size="12" fill="${statusColor}" text-anchor="middle" font-weight="bold">${isOnline ? data.players.online+'/'+data.players.max : 'OFFLINE'}</text>
+      
+      <g transform="translate(35, 35)">
+        <image href="${icon}" width="64" height="64" clip-path="url(#iphone-mask)" />
+      </g>
+      
+      <text x="115" y="60" font-family="Arial" font-size="22" fill="#ffffff" font-weight="bold" class="shadow">${serverIP}</text>
+      <text x="115" y="85" font-family="Arial" font-size="13" fill="#9399b2" class="shadow">${version}</text>
+      
+      <rect x="315" y="40" width="105" height="28" rx="14" fill="#000000" fill-opacity="0.5"/>
+      <text x="367" y="58" font-family="Arial" font-size="12" font-weight="bold" fill="${statusColor}" text-anchor="middle" class="shadow">
+        ${isOnline ? data.players.online + ' / ' + data.players.max : 'OFFLINE'}
+      </text>
+
       <foreignObject x="35" y="115" width="380" height="60">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="color:#fff; font-size:16px; line-height:1.4; font-family:sans-serif;">${motdHtml}</div>
+        <div xmlns="http://www.w3.org/1999/xhtml" class="motd-container" style="color:#ffffff; font-size:16px;">
+          ${motdHtml}
+        </div>
       </foreignObject>
-      <text x="35" y="205" font-family="Arial" font-size="11" fill="#64D2FF" font-weight="bold">ONLINE PLAYERS</text>
-      <foreignObject x="35" y="215" width="380" height="150">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:14px; color:#fff; line-height:1.6; font-family:sans-serif;">${playerHtml}</div>
+
+      <text x="35" y="205" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="shadow">ONLINE PLAYERS</text>
+      <foreignObject x="35" y="215" width="380" height="${playerAreaHeight}">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="player-container" style="font-size:14px; line-height:1.6;">
+          ${playerHtml}
+        </div>
       </foreignObject>
     </svg>`;
     
-    return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
+    return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" } });
   } catch (e) {
     return new Response("Error", { status: 500 });
   }
@@ -63,65 +107,108 @@ async function handleImageRequest(serverIP) {
 
 const htmlTemplate = `
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MC Status Card</title>
+    <title>MC 状态卡片</title>
     <style>
-        :root { --px: 0px; --py: 0px; }
-        body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center; background: #000; font-family: -apple-system, sans-serif; overflow: hidden; }
-        #bg { position: fixed; top: -10%; left: -10%; width: 120%; height: 120%; background: url('https://other.api.yilx.cc/api/moe') center/cover; z-index: -1; transform: translate(calc(var(--px)*-1.2), calc(var(--py)*-1.2)); transition: 0.1s; }
+        body { 
+            margin: 0; padding: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            background: url('https://other.api.yilx.cc/api/moe') no-repeat center center fixed; background-size: cover;
+        }
+        body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.3); z-index: -1; }
+        
         .box { 
-            background: rgba(255,255,255,0.1); backdrop-filter: blur(25px) saturate(160%); -webkit-backdrop-filter: blur(25px) saturate(160%);
-            padding: 30px; border-radius: 40px; width: 85%; max-width: 380px; 
-            border: 1px solid rgba(255,255,255,0.15); transform: translate(var(--px), var(--py)); color: #fff; text-align: center;
+            background: rgba(255, 255, 255, 0.15); 
+            backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+            padding: 45px 35px; 
+            border-radius: 50px; /* iPhone 连续曲率风格 */
+            width: 85%; max-width: 460px; text-align: center; 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
         }
-        textarea { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 15px; border: none; background: rgba(0,0,0,0.3); color: #fff; font-size: 16px; box-sizing: border-box; outline: none; }
-        button { background: #fff; color: #000; border: none; padding: 15px; border-radius: 15px; font-weight: 700; width: 100%; font-size: 16px; cursor: pointer; }
-        #res img { width: 100%; border-radius: 25px; margin-top: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .dl-btn { 
-            display: none; background: rgba(255,255,255,0.15); color: #fff; margin-top: 15px; padding: 12px; 
-            border-radius: 15px; font-weight: 600; text-decoration: none; font-size: 14px;
+        
+        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 20px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
+        h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+        p.desc { color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 12px 0 35px; }
+        
+        textarea { 
+            width: 100%; min-height: 54px; padding: 18px; margin-bottom: 18px; 
+            border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); 
+            background: rgba(0, 0, 0, 0.25); color: white; 
+            box-sizing: border-box; font-size: 17px; font-family: inherit;
+            outline: none; resize: none; overflow: hidden; display: block;
+            transition: 0.3s ease;
         }
-        .dl-btn.show { display: block; }
+        textarea:focus { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.3); }
+        
+        button { 
+            background: white; color: #000; border: none; height: 54px; 
+            border-radius: 20px; font-weight: 700; cursor: pointer; 
+            width: 100%; font-size: 17px; transition: all 0.4s cubic-bezier(0.15, 0, 0.2, 1);
+        }
+        button:hover { background: #eee; transform: scale(1.02); }
+        button:active { transform: scale(0.98); }
+        
+        #res { margin-top: 40px; width: 100%; }
+        #full-motd-box { 
+            margin-top: 25px; padding: 22px; background: rgba(0,0,0,0.45); 
+            border-radius: 28px; text-align: left; display: none; 
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .motd-title { color: #fab387; font-size: 12px; font-weight: 900; margin-bottom: 12px; opacity: 0.9; text-transform: uppercase; }
+        #full-motd-content { line-height: 1.7; font-size: 14px; white-space: pre-wrap; }
+        
+        img.card-img { width: 100%; border-radius: 45px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .footer { margin-top: 35px; font-size: 13px; opacity: 0.4; font-weight: 500; }
     </style>
 </head>
-<body onmousemove="m(event)">
-    <div id="bg"></div>
+<body>
     <div class="box">
-        <textarea id="ip" placeholder="输入服务器 IP..."></textarea>
-        <button onclick="gen()">生成卡片</button>
+        <img src="https://ib.a0b.de5.net/file/1770001024571_2307052_Mvie09JU.png" class="logo">
+        <h2>服务器状态</h2>
+        <p class="desc">输入Minecraft服务器地址，一键获取</p>
+        
+        <textarea id="ip" placeholder="play.hypixel.net" rows="1" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+        <button onclick="gen()">生成预览卡片</button>
+        
         <div id="res"></div>
-        <a id="dl" class="dl-btn" onclick="save()">点击下载卡片</a>
+        
+        <div id="full-motd-box">
+            <div class="motd-title">完整 MOTD 信息 (已截断)</div>
+            <div id="full-motd-content"></div>
+        </div>
+
+        <div class="footer">© 2026 MC Status Card • iOS Style</div>
     </div>
     <script>
-        let url = '';
-        function m(e) { 
-            const x = (window.innerWidth/2 - e.pageX)/40; 
-            const y = (window.innerHeight/2 - e.pageY)/40;
-            document.documentElement.style.setProperty('--px', x+'px');
-            document.documentElement.style.setProperty('--py', y+'px');
-        }
         async function gen() {
             const ip = document.getElementById('ip').value.trim();
             if(!ip) return;
-            url = window.location.origin + '?server=' + encodeURIComponent(ip);
-            const res = document.getElementById('res');
-            const btn = document.getElementById('dl');
-            res.innerHTML = '<p>加载中...</p>';
+            const resDiv = document.getElementById('res');
+            const fullMotdBox = document.getElementById('full-motd-box');
+            resDiv.innerHTML = '<p style="opacity:0.6; font-size:14px;">正在连接...</p>';
+            fullMotdBox.style.display = 'none';
+
+            const imageUrl = window.location.origin + '?server=' + encodeURIComponent(ip);
             const img = new Image();
-            img.onload = () => { res.innerHTML = ''; res.appendChild(img); btn.classList.add('show'); };
-            img.src = url;
-        }
-        async function save() {
-            const r = await fetch(url);
-            const b = await r.blob();
-            const u = window.URL.createObjectURL(b);
-            const a = document.createElement('a');
-            a.href = u; a.download = 'mc-status.svg';
-            a.click();
+            img.className = 'card-img';
+            img.onload = () => { resDiv.innerHTML = ''; resDiv.appendChild(img); };
+            img.src = imageUrl;
+
+            try {
+                const infoRes = await fetch(window.location.origin + '?type=info&server=' + encodeURIComponent(ip));
+                const infoData = await infoRes.json();
+                if (infoData.online) {
+                    fullMotdBox.style.display = 'block';
+                    document.getElementById('full-motd-content').innerHTML = infoData.motd;
+                }
+            } catch(e) {}
         }
     </script>
 </body>
-</html>`;
+</html>
+`;
