@@ -1,0 +1,30 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "my-worker-project"   # 你的项目名称
+main = "index.js"            # 入口文件
+compatibility_date = "2024-05-01"
+
+# 1. [vars] - 环境变量 (例如：API 地址、配置开关)
+[vars]
+API_URL = "https://api.example.com"
+ENVIRONMENT = "production"
+
+# 2. [[kv_namespaces]] - KV 数据库绑定
+# 如果你在网页端创建了 KV，请取消下面的注释并填入 ID
+# [[kv_namespaces]]
+# binding = "MY_KV"
+# id = "这里填入你的KV_ID"
+
+# 3. [[r2_buckets]] - R2 对象存储绑定
+# [[r2_buckets]]
+# binding = "MY_BUCKET"
+# bucket_name = "你的桶名称"
+
+# 4. [[d1_databases]] - D1 数据库绑定
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "你的数据库名"
+# database_id = "这里填入你的数据库ID"
+
+# 5. [observability] - 开启日志监控 (推荐)
+[observability]
+enabled = true
