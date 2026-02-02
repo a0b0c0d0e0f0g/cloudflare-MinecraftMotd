@@ -16,36 +16,30 @@ async function handleImageRequest(serverIP) {
     const data = await res.json();
     const isOnline = data.online;
     
-    // 1. MOTD 处理：按行切割并清理
-    let motdLines = ["A Minecraft Server"];
-    if (isOnline && data.motd?.clean) {
-      motdLines = data.motd.clean.split('\n').map(l => l.trim()).slice(0, 2);
-    } else if (!isOnline) {
-      motdLines = ["Server is currently offline."];
-    }
+    // 1. MOTD 颜色处理 (使用 HTML 渲染)
+    const motdHtml = isOnline ? (data.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
 
-    // 2. 玩家列表处理 (每行一个)
+    // 2. 玩家列表处理
     let playerLines = [];
     if (isOnline && data.players.list?.length > 0) {
-      playerLines = data.players.list.slice(0, 4).map(p => p.name_clean);
-      if (data.players.list.length > 4) playerLines.push("...");
+      playerLines = data.players.list.slice(0, 5).map(p => p.name_clean);
+      if (data.players.list.length > 5) playerLines.push("...");
     } else if (isOnline && data.players.online > 0) {
       playerLines = [`${data.players.online} player(s) online`];
+    } else {
+      playerLines = ["No players online"];
     }
 
-    // 3. 动态计算卡片高度
-    // 基础高度 130 + MOTD行数*20 + 玩家行数*18
-    const cardHeight = 140 + (motdLines.length * 20) + (playerLines.length * 18);
+    // 3. 动态高度计算
+    const motdAreaHeight = 45; 
+    const playerAreaHeight = playerLines.length * 18 + 25; 
+    const cardHeight = 160 + motdAreaHeight + playerAreaHeight;
     
-    const version = isOnline ? (data.version?.name_clean || "Java") : "N/A";
+    const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
     const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
 
-    const svgMotd = motdLines.map((line, i) => 
-      `<text x="105" y="${88 + i * 22}" font-family="Arial" font-size="14" fill="#bac2de">${line}</text>`
-    ).join("");
-
     const svgPlayers = playerLines.map((name, i) => 
-      `<text x="230" y="${120 + i * 18}" font-family="Arial" font-size="12" fill="#94e2d5" font-style="italic">${name}</text>`
+      `<text x="105" y="${165 + i * 18}" font-family="Arial" font-size="12" fill="#94e2d5" font-style="italic">${name}</text>`
     ).join("");
 
     const svg = `<svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
@@ -53,11 +47,20 @@ async function handleImageRequest(serverIP) {
       <image href="${icon}" x="25" y="35" width="64" height="64" />
       <text x="105" y="45" font-family="Arial" font-size="20" fill="#cdd6f4" font-weight="bold">${serverIP}</text>
       <text x="105" y="65" font-family="Arial" font-size="12" fill="#fab387">${version}</text>
-      ${svgMotd}
-      <rect x="105" y="${cardHeight - 40}" width="85" height="22" rx="11" fill="${isOnline ? '#a6e3a1' : '#f38ba8'}" fill-opacity="0.15"/>
-      <text x="115" y="${cardHeight - 25}" font-family="Arial" font-size="12" font-weight="bold" fill="${isOnline ? '#a6e3a1' : '#f38ba8'}">${isOnline ? data.players.online + '/' + data.players.max : 'OFFLINE'}</text>
-      <text x="230" y="${cardHeight - 40 - (playerLines.length * 18) + 10}" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold">PLAYERS:</text>
+      
+      <foreignObject x="105" y="80" width="320" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="color:#bac2de; font-family:Arial; font-size:14px; line-height:1.4; overflow:hidden;">
+          ${motdHtml}
+        </div>
+      </foreignObject>
+
+      <line x1="105" y1="135" x2="420" y2="135" stroke="#313244" stroke-width="1" />
+      
+      <text x="105" y="152" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold">PLAYERS:</text>
       ${svgPlayers}
+
+      <rect x="25" y="${cardHeight - 40}" width="85" height="22" rx="11" fill="${isOnline ? '#a6e3a1' : '#f38ba8'}" fill-opacity="0.15"/>
+      <text x="35" y="${cardHeight - 25}" font-family="Arial" font-size="12" font-weight="bold" fill="${isOnline ? '#a6e3a1' : '#f38ba8'}">${isOnline ? data.players.online + '/' + data.players.max : 'OFFLINE'}</text>
     </svg>`;
     return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=60" } });
   } catch (e) {
@@ -77,7 +80,7 @@ const htmlTemplate = `
         [data-theme="light"] { --bg: #eff1f5; --card: #e6e9ef; --text: #4c4f69; --accent: #8839ef; }
         body { background: var(--bg); color: var(--text); font-family: system-ui; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; transition: 0.3s; }
         .container { background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; width: 100%; max-width: 400px; }
-        .theme-btn { position: fixed; top: 15px; right: 15px; cursor: pointer; font-size: 20px; background: var(--card); padding: 8px; border-radius: 50%; border: 1px solid var(--accent); z-index: 100; }
+        .theme-btn { position: fixed; top: 15px; right: 15px; cursor: pointer; font-size: 20px; background: var(--card); padding: 8px; border-radius: 50%; border: 1px solid var(--accent); }
         input { width: 100%; padding: 12px; margin: 15px 0; border: none; border-radius: 10px; background: var(--bg); color: var(--text); box-sizing: border-box; border: 1px solid var(--accent); }
         button { background: var(--accent); color: #11111b; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; }
         #preview { margin-top: 25px; width: 100%; }
@@ -89,7 +92,7 @@ const htmlTemplate = `
     <div class="theme-btn" onclick="setTheme()">🌓</div>
     <div class="container">
         <h3 style="margin:0">Minecraft Status Card</h3>
-        <input type="text" id="ip" placeholder="输入服务器 IP (如: hypixel.net)">
+        <input type="text" id="ip" placeholder="输入服务器 IP (如: play.hypixel.net)">
         <button onclick="gen()">立即生成</button>
         <div id="preview"></div>
         <div id="code" class="code-box"></div>
@@ -97,14 +100,12 @@ const htmlTemplate = `
     <script>
         const savedTheme = localStorage.getItem('mc-theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
-
         function setTheme() {
             const current = document.body.getAttribute('data-theme');
             const next = current === 'dark' ? 'light' : 'dark';
             document.body.setAttribute('data-theme', next);
             localStorage.setItem('mc-theme', next);
         }
-
         function gen() {
             const ip = document.getElementById('ip').value.trim();
             if(!ip) return;
