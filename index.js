@@ -44,7 +44,6 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
-            // 1. 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
@@ -54,7 +53,6 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 2. 状态查询
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
@@ -194,7 +192,7 @@ async function generateSvgString(serverIP, env) {
     const playerAreaHeight = Math.max((players.length||1)*22, 30);
     const h = headerHeight + 85 + 35 + playerAreaHeight + 45;
 
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -223,6 +221,7 @@ async function generateSvgString(serverIP, env) {
     </svg>`;
 }
 
+// 模式 C: 直接返回图片
 async function handleImageRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
@@ -230,6 +229,7 @@ async function handleImageRequest(ip, env) {
     } catch(e) { return new Response("Error", {status:500}); }
 }
 
+// 模式 B: 返回纯 HTML 卡片
 async function handleHtmlCardRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
@@ -284,7 +284,7 @@ async function handleAuthLogin(req, env) {
     return new Response('{"success":false}', {status:401});
 }
 
-// --- 主页 HTML (iOS 药丸风格 + 鼠标光效) ---
+// --- 主页 HTML (UI 升级) ---
 function renderHTML(config) {
     const bg = config.bgImage || 'https://other.api.yilx.cc/api/moe';
     const title = config.title || '服务器状态';
@@ -303,35 +303,37 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 .logo{width:85px;height:85px;margin-bottom:25px;border-radius:35px;box-shadow:0 12px 24px rgba(0,0,0,0.3)}
 h2{margin:0;font-size:26px;font-weight:800}p.d{color:#ffffffb3;font-size:15px;margin:12px 0 35px}
 
-/* iOS 药丸风格 + 光效基础 */
-.input-group, button {
-    position: relative;
-    border-radius: 99em; /* 药丸 */
-    overflow: hidden;
-    transition: transform 0.1s;
-}
+/* 立体 UI 风格 */
 textarea {
     width:100%; min-height:54px; padding:18px 25px; 
-    border-radius:30px; /* 输入框稍微方一点点方便多行 */
+    border-radius:20px; /* 还原圆角 */
     font-size:17px; 
     background:rgba(0,0,0,0.25); 
     border:1px solid rgba(255,255,255,0.1); 
     color:#fff; 
     scrollbar-width:none; -ms-overflow-style:none;
     outline: none;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    /* 凹陷立体感 */
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.4), inset 0 0 2px rgba(0,0,0,0.6);
     backdrop-filter: blur(10px);
 }
 textarea::-webkit-scrollbar{display:none}
 
 button {
-    background: #fff; color: #000; border: none; 
+    background: linear-gradient(145deg, #ffffff, #e6e6e6); 
+    color: #000; border: none; 
     height: 54px; width: 100%; 
+    border-radius: 50px;
     font-weight: 700; font-size: 17px; cursor: pointer;
     margin-top: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    /* 凸起立体感 */
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.05);
+    transition: transform 0.1s, box-shadow 0.1s;
 }
-button:active { transform: scale(0.96); box-shadow: 0 2px 10px rgba(255,255,255,0.3); }
+button:active { 
+    transform: translateY(3px); 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3), inset 0 2px 3px rgba(0,0,0,0.2); 
+}
 
 /* 鼠标跟随光效 CSS */
 .spotlight {
