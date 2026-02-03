@@ -22,11 +22,10 @@ export default {
       return new Response(renderHTML(config), { headers: { "Content-Type": "text/html;charset=UTF-8" } });
     }
     
-    // 模式区分
     const type = url.searchParams.get("type");
     if (type === "info") return handleInfoRequest(serverIP);
-    if (type === "card") return handleHtmlCardRequest(serverIP, env); // 截图专用HTML
-    return handleImageRequest(serverIP, env); // 默认SVG图片
+    if (type === "card") return handleHtmlCardRequest(serverIP, env); 
+    return handleImageRequest(serverIP, env); 
   }
 };
 
@@ -60,12 +59,13 @@ async function handleTelegramWebhook(request, env) {
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
             else if (text === statusCmd) {
-                await sendTelegramMessage(token, chatId, `请使用: \`${statusCmd} <IP>\``, "MarkdownV2");
+                // 转义指令提示中的字符
+                const escapedCmd = statusCmd.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+                await sendTelegramMessage(token, chatId, `请使用: \`${escapedCmd} <IP>\``, "MarkdownV2");
                 return new Response("OK");
             }
 
             if (serverIP) {
-                // 获取数据
                 let data;
                 try {
                     data = await fetchMinecraftStatus(serverIP);
@@ -74,31 +74,30 @@ async function handleTelegramWebhook(request, env) {
                     return new Response("OK");
                 }
 
-                const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+                // 统一转义函数：修复了上一版漏掉反斜杠的问题
+                const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
 
                 if (!data.online) {
                     await sendTelegramMessage(token, chatId, `🔴 *${esc(serverIP)}* 离线`, "MarkdownV2");
                 } else {
-                    // 准备文本内容
-                    const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+                    const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+                    
                     const textCaption = `🟢 *${esc(serverIP)}* 在线\n` +
                                         `👥 人数: \`${esc(data.players.online)}/${esc(data.players.max)}\`\n` +
                                         `ℹ️ 版本: ${esc(data.version.name_clean)}\n` +
-                                        `📝 MOTD: ${cleanMotd}`;
+                                        `📝 MOTD:\n${cleanMotd}`;
 
-                    // 尝试发送图片
                     try {
                         const workerUrl = new URL(request.url).origin;
-                        // 使用 type=card 获取纯净HTML供截图
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
-                        // mshots 截图服务，宽 460
+                        // mshots 截图
                         const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
-                        // 【关键修复】如果发图失败（超时/报错），降级发送文本消息
-                        console.error("发图失败，转文本:", imgError);
-                        const errorMsg = `⚠️ _图片生成失败 (${imgError.message})，仅显示文字:_\n\n${textCaption}`;
+                        // 【修复点】之前的报错消息里含有未转义的括号，导致发送失败。现在修复了。
+                        const errStr = (imgError.message || "Unknown").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+                        const errorMsg = `⚠️ _图片生成失败 \\(${errStr}\\)，转为文本模式:_\n\n${textCaption}`;
                         await sendTelegramMessage(token, chatId, errorMsg, "MarkdownV2");
                     }
                 }
@@ -150,7 +149,7 @@ async function generateSvgString(serverIP, env) {
     const statusX = 320;
     const statusTextX = 372.5;
     const h = 320 + Math.max((players.length||1)*22, 30);
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -189,7 +188,6 @@ async function handleImageRequest(ip, env) {
 async function handleHtmlCardRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
-        // 添加 viewport 标签优化截图渲染
         const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden">${svg}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
