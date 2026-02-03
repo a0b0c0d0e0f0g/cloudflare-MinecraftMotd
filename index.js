@@ -27,8 +27,28 @@ async function handleImageRequest(serverIP) {
   const backgroundImage = `https://other.api.yilx.cc/api/moe?t=${Date.now()}`; 
 
   try {
+    // 1. 开始计时 (用于计算 Ping)
+    const startTime = Date.now();
+    
     const res = await fetch(apiUrl, { cf: { cacheTtl: 60 } });
     const data = await res.json();
+    
+    // 1. 结束计时，计算 Ping (API 延迟)
+    const ping = Date.now() - startTime;
+
+    // 2. 获取北京时间 (精确到秒)
+    const timeFormatter = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    const timeStr = timeFormatter.format(new Date()).replace(/\//g, '-'); // 格式: 2024-05-01 12:00:00
+
     const isOnline = data.online;
     const motdHtml = isOnline ? (data.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
 
@@ -44,7 +64,9 @@ async function handleImageRequest(serverIP) {
     }
 
     const playerAreaHeight = Math.max(playerCount * 24, 30);
-    const cardHeight = 255 + playerAreaHeight;
+    
+    // 3. 修改高度：基础高度从 255 增加到 290，为底部 Ping 和时间留出空间
+    const cardHeight = 290 + playerAreaHeight;
     
     const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
     const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
@@ -55,7 +77,6 @@ async function handleImageRequest(serverIP) {
     const statusTextX = 517;
     const contentWidth = 530;
 
-    // 修改重点：去掉了 ${motdHtml} 周围的空格和换行
     const svg = `<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <style>
@@ -111,6 +132,10 @@ async function handleImageRequest(serverIP) {
           ${playerHtml}
         </div>
       </foreignObject>
+
+      <text x="35" y="${cardHeight - 15}" font-family="Arial" font-size="12" fill="rgba(255,255,255,0.6)" class="shadow">Ping: ${ping}ms</text>
+      <text x="${cardWidth - 35}" y="${cardHeight - 15}" text-anchor="end" font-family="Arial" font-size="12" fill="rgba(255,255,255,0.6)" class="shadow">${timeStr}</text>
+
     </svg>`;
     
     return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" } });
