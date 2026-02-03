@@ -30,7 +30,7 @@ export default {
 };
 
 // ==========================================
-//           Telegram 核心逻辑 (修复版)
+//           Telegram 核心逻辑
 // ==========================================
 async function handleTelegramWebhook(request, env) {
     const config = await getConfig(env);
@@ -54,12 +54,11 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 2. 状态查询 (默认 /motd)
+            // 2. 状态查询
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
             else if (text === statusCmd) {
-                // 转义指令提示中的字符
                 const escapedCmd = statusCmd.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
                 await sendTelegramMessage(token, chatId, `请使用: \`${escapedCmd} <IP>\``, "MarkdownV2");
                 return new Response("OK");
@@ -74,14 +73,12 @@ async function handleTelegramWebhook(request, env) {
                     return new Response("OK");
                 }
 
-                // 统一转义函数：修复了上一版漏掉反斜杠的问题
                 const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
 
                 if (!data.online) {
                     await sendTelegramMessage(token, chatId, `🔴 *${esc(serverIP)}* 离线`, "MarkdownV2");
                 } else {
                     const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
-                    
                     const textCaption = `🟢 *${esc(serverIP)}* 在线\n` +
                                         `👥 人数: \`${esc(data.players.online)}/${esc(data.players.max)}\`\n` +
                                         `ℹ️ 版本: ${esc(data.version.name_clean)}\n` +
@@ -90,14 +87,14 @@ async function handleTelegramWebhook(request, env) {
                     try {
                         const workerUrl = new URL(request.url).origin;
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
-                        // mshots 截图
-                        const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
+                        
+                        // 使用 Microlink 截图
+                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=600&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
-                        // 【修复点】之前的报错消息里含有未转义的括号，导致发送失败。现在修复了。
                         const errStr = (imgError.message || "Unknown").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
-                        const errorMsg = `⚠️ _图片生成失败 \\(${errStr}\\)，转为文本模式:_\n\n${textCaption}`;
+                        const errorMsg = `⚠️ _发图失败 \\(${errStr}\\)，显示文本:_\n\n${textCaption}`;
                         await sendTelegramMessage(token, chatId, errorMsg, "MarkdownV2");
                     }
                 }
@@ -141,15 +138,19 @@ async function generateSvgString(serverIP, env) {
 
     const isOnline = d.online;
     const motd = isOnline ? (d.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
+    
+    // 修复点：完整的玩家列表生成逻辑
     const players = (isOnline && d.players.list) ? d.players.list : [];
-    const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:20px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
+    const pListHtml = players.length > 0 
+        ? players.map(p => `<div style="height:20px;color:#fff">${p.name_html || p.name_clean}</div>`).join("") 
+        : '<div style="color:#fff;opacity:0.5">No players online</div>';
     
     const cardWidth = 460;
     const contentW = 390; 
     const statusX = 320;
     const statusTextX = 372.5;
     const h = 320 + Math.max((players.length||1)*22, 30);
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
