@@ -15,19 +15,30 @@ export default {
     }
     if (url.pathname === '/api/setWebhook' && request.method === 'POST') return handleSetWebhook(request, env);
 
-    // 3. 页面与图片逻辑
+    // 3. 页面与内容逻辑
     const serverIP = url.searchParams.get("server");
+    
+    // 如果没有 IP，返回主页
     if (!serverIP) {
       const config = await getConfig(env);
       return new Response(renderHTML(config), { headers: { "Content-Type": "text/html;charset=UTF-8" } });
     }
-    if (url.searchParams.get("type") === "info") return handleInfoRequest(serverIP);
+
+    const type = url.searchParams.get("type");
+
+    // 模式 A: API 数据
+    if (type === "info") return handleInfoRequest(serverIP);
+    
+    // 模式 B: 截图专用 HTML 卡片 (新增，用于 Telegram 发图)
+    if (type === "card") return handleHtmlCardRequest(serverIP, env);
+
+    // 模式 C: 直接 SVG 图片 (默认)
     return handleImageRequest(serverIP, env);
   }
 };
 
 // ==========================================
-//           Telegram 核心逻辑 (修复版)
+//           Telegram 核心逻辑
 // ==========================================
 async function handleTelegramWebhook(request, env) {
     const config = await getConfig(env);
@@ -41,7 +52,7 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
-            // 1. 自定义回复
+            // 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
@@ -51,35 +62,35 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 2. 状态查询 (默认 /motd)
+            // 状态查询
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
-            
-            if (text.startsWith(statusCmd + " ")) {
-                serverIP = text.substring(statusCmd.length + 1).trim();
-            } else if (text === statusCmd) {
+            if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
+            else if (text === statusCmd) {
                 await sendTelegramMessage(token, chatId, `请使用: \`${statusCmd} <IP>\``, "MarkdownV2");
                 return new Response("OK");
             }
 
             if (serverIP) {
                 try {
+                    // 先发一个“正在查询”的状态 (可选，如果查询很慢的话)
+                    // await sendTelegramMessage(token, chatId, "🔍 ...", null);
+
                     const data = await fetchMinecraftStatus(serverIP);
-                    
-                    // 辅助转义函数：防止 MarkdownV2 报错
                     const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 
                     if (!data.online) {
-                        const msg = `🔴 *${esc(serverIP)}* 离线`;
-                        await sendTelegramMessage(token, chatId, msg, "MarkdownV2");
+                        await sendTelegramMessage(token, chatId, `🔴 *${esc(serverIP)}* 离线`, "MarkdownV2");
                     } else {
                         const workerUrl = new URL(request.url).origin;
-                        const cardUrl = `${workerUrl}/?server=${encodeURIComponent(serverIP)}`;
-                        // 截图宽度 460，增加时间戳防缓存
+                        
+                        // 修改：使用 type=card 获取纯 HTML 页面进行截图，比截 SVG 稳定得多
+                        const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
+                        
+                        // 使用 mshots 截图，宽度 460
                         const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
                         
-                        const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&'); // MOTD 单独处理
-                        
+                        const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
                         const caption = `🟢 *${esc(serverIP)}* 在线\n` +
                                         `👥 人数: \`${esc(data.players.online)}/${esc(data.players.max)}\`\n` +
                                         `ℹ️ 版本: ${esc(data.version.name_clean)}\n` +
@@ -88,61 +99,127 @@ async function handleTelegramWebhook(request, env) {
                         await sendTelegramPhoto(token, chatId, screenshotUrl, caption);
                     }
                 } catch (err) {
-                    // 发生错误时通知用户，而不是沉默
-                    await sendTelegramMessage(token, chatId, `❌ 查询出错: ${err.message || "Unknown Error"}`, null);
+                    await sendTelegramMessage(token, chatId, `❌ 查询出错: ${err.message}`, null);
                 }
             }
         }
         return new Response("OK");
-    } catch (e) {
-        return new Response("Error", { status: 200 });
-    }
+    } catch (e) { return new Response("Error", { status: 200 }); }
 }
 
+// --- 消息发送工具 ---
 async function sendTelegramMessage(token, chatId, text, parseMode) {
     const payload = { chat_id: chatId, text: text };
     if (parseMode) payload.parse_mode = parseMode;
-    
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     });
-    // 检查响应，如果报错抛出异常以便捕获
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.description);
 }
 
 async function sendTelegramPhoto(token, chatId, photo, caption) {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-            chat_id: chatId, 
-            photo: photo, 
-            caption: caption, 
-            parse_mode: 'MarkdownV2' 
+            chat_id: chatId, photo: photo, caption: caption, parse_mode: 'MarkdownV2' 
         })
     });
-    const data = await res.json();
-    if (!data.ok) throw new Error("发图失败: " + data.description);
+    // 错误处理：如果发图失败，尝试发文本报错，方便调试
+    const d = await res.json();
+    if (!d.ok) throw new Error("发图失败: " + d.description);
 }
 
-// --- 配置逻辑 ---
+// ==========================================
+//           核心逻辑：生成 SVG 字符串
+// ==========================================
+// 提取这个函数以便 handleImageRequest 和 handleHtmlCardRequest 复用
+async function generateSvgString(serverIP, env) {
+    const conf = await getConfig(env);
+    const bg = conf.bgImage || `https://other.api.yilx.cc/api/moe?t=${Date.now()}`;
+    
+    const t0 = Date.now();
+    const d = await fetchMinecraftStatus(serverIP);
+    const ping = Date.now() - t0;
+    const time = new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date()).replace(/\//g,'-');
+
+    const isOnline = d.online;
+    const motd = isOnline ? (d.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
+    const players = (isOnline && d.players.list) ? d.players.list : [];
+    const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:20px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
+    
+    // 布局常量
+    const cardWidth = 460;
+    const contentW = 390; 
+    const statusX = 320;
+    const statusTextX = 372.5;
+    const h = 320 + Math.max((players.length||1)*22, 30);
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+
+    return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <style>
+                .sh{text-shadow:1px 1px 2px rgba(0,0,0,0.8)}
+                .mc{display:block;white-space:pre-wrap;word-wrap:break-word;overflow:hidden;text-shadow:1px 1px 2px #000;font-family:sans-serif;line-height:1.4;max-height:85px;color:#fff;font-size:14px}
+                .mc span{display:inline}
+                .pc div{display:block;font-family:sans-serif;text-shadow:1px 1px 2px #000;font-size:12px}
+            </style>
+            <clipPath id="im"><rect width="64" height="64" rx="22.5"/></clipPath>
+            <clipPath id="cm"><rect width="${cardWidth}" height="${h}" rx="50"/></clipPath>
+        </defs>
+        <g clip-path="url(#cm)"><image href="${bg}" width="${cardWidth}" height="${h}" preserveAspectRatio="xMidYMid slice"/><rect width="${cardWidth}" height="${h}" fill="#111c" fill-opacity="0.75"/></g>
+        <g transform="translate(35,35)"><image href="${icon}" width="64" height="64" clip-path="url(#im)"/></g>
+        <text x="115" y="60" font-family="Arial" font-size="20" fill="#fff" font-weight="bold" class="sh">${serverIP}</text>
+        <text x="115" y="85" font-family="Arial" font-size="12" fill="#9399b2" class="sh">${isOnline?(d.version?.name_clean||"Java"):"N/A"}</text>
+        <rect x="${statusX}" y="40" width="105" height="28" rx="14" fill="#000" fill-opacity="0.5"/>
+        <text x="${statusTextX}" y="58" font-family="Arial" font-size="11" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${isOnline?d.players.online+' / '+d.players.max:'OFFLINE'}</text>
+        <foreignObject x="35" y="115" width="${contentW}" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
+        <text x="35" y="230" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
+        <foreignObject x="35" y="240" width="${contentW}" height="${Math.max((players.length||1)*22,30)}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
+        <text x="35" y="${h-45}" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">Ping: ${ping}ms</text>
+        <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">${time}</text>
+    </svg>`;
+}
+
+// 模式 C: 直接返回图片 (浏览器直接访问用)
+async function handleImageRequest(ip, env) {
+    try {
+        const svg = await generateSvgString(ip, env);
+        return new Response(svg, {headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-cache'}});
+    } catch(e) { return new Response("Error", {status:500}); }
+}
+
+// 模式 B: 返回包含图片的 HTML 页面 (截图工具用)
+async function handleHtmlCardRequest(ip, env) {
+    try {
+        const svg = await generateSvgString(ip, env);
+        // 生成一个紧凑的 HTML 页面，只有 SVG，没有边距，确保截图精确
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden"><body style="margin:0;padding:0;overflow:hidden">${svg}</body></html>`;
+        return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
+    } catch(e) { return new Response("Error", {status:500}); }
+}
+
+// ==========================================
+//           通用配置与逻辑
+// ==========================================
 async function getConfig(env) {
     if (!env.MOTD_KV) return {};
-    try {
-        const val = await env.MOTD_KV.get("SITE_CONFIG");
-        return val ? JSON.parse(val) : {};
-    } catch (e) { return {}; }
+    try { const v = await env.MOTD_KV.get("SITE_CONFIG"); return v ? JSON.parse(v) : {}; } catch(e){return{}}
 }
-
 async function checkAuth(env, auth) {
     if (!env.MOTD_KV || !auth) return false;
     const u = await env.MOTD_KV.get("ADMIN_USER");
     const p = await env.MOTD_KV.get("ADMIN_PASS");
     return auth.username === u && auth.password === p;
 }
-
-// --- API 处理 ---
+async function fetchMinecraftStatus(ip) {
+    const res = await fetch(`https://api.mcstatus.io/v2/status/java/${encodeURIComponent(ip)}`, {cf:{cacheTtl:60}});
+    return await res.json();
+}
+async function handleInfoRequest(ip) {
+    const d = await fetchMinecraftStatus(ip);
+    return new Response(JSON.stringify({motd:d.motd?.html||"", online:d.online}), {headers:{'Content-Type':'application/json'}});
+}
+// API Handlers
 async function handleGetConfig(env) {
     return new Response(JSON.stringify(await getConfig(env)), {headers:{'Content-Type':'application/json'}});
 }
@@ -151,8 +228,7 @@ async function handleSaveConfig(req, env) {
     if(await checkAuth(env, body.auth)){
         await env.MOTD_KV.put("SITE_CONFIG", JSON.stringify(body.config));
         return new Response('{"success":true}', {headers:{'Content-Type':'application/json'}});
-    }
-    return new Response('{"success":false}', {status:401});
+    } return new Response('{"success":false}', {status:401});
 }
 async function handleSetWebhook(req, env) {
     const body = await req.json();
@@ -169,63 +245,7 @@ async function handleAuthLogin(req, env) {
     return new Response('{"success":false}', {status:401});
 }
 
-// --- MC 状态 ---
-async function fetchMinecraftStatus(ip) {
-    const res = await fetch(`https://api.mcstatus.io/v2/status/java/${encodeURIComponent(ip)}`, {cf:{cacheTtl:60}});
-    return await res.json();
-}
-async function handleInfoRequest(ip) {
-    const d = await fetchMinecraftStatus(ip);
-    return new Response(JSON.stringify({motd:d.motd?.html||"", online:d.online}), {headers:{'Content-Type':'application/json'}});
-}
-
-// --- 图片生成 ---
-async function handleImageRequest(ip, env) {
-    const conf = await getConfig(env);
-    const bg = conf.bgImage || `https://other.api.yilx.cc/api/moe?t=${Date.now()}`;
-    
-    try {
-        const t0 = Date.now();
-        const d = await fetchMinecraftStatus(ip);
-        const ping = Date.now() - t0;
-        const time = new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date()).replace(/\//g,'-');
-
-        const isOnline = d.online;
-        const motd = isOnline ? (d.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
-        const players = (isOnline && d.players.list) ? d.players.list : [];
-        const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:20px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
-        
-        const cardWidth = 460;
-        const contentW = 390; 
-        const statusX = 320;
-        const statusTextX = 372.5;
-
-        const h = 320 + Math.max((players.length||1)*22, 30);
-        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
-
-        const svg = `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <style>.sh{text-shadow:1px 1px 2px rgba(0,0,0,0.8)}.mc{display:block;white-space:pre-wrap;word-wrap:break-word;overflow:hidden;text-shadow:1px 1px 2px #000;font-family:sans-serif;line-height:1.4;max-height:85px;color:#fff;font-size:14px}.mc span{display:inline}.pc div{display:block;font-family:sans-serif;text-shadow:1px 1px 2px #000;font-size:12px}</style>
-                <clipPath id="im"><rect width="64" height="64" rx="22.5"/></clipPath>
-                <clipPath id="cm"><rect width="${cardWidth}" height="${h}" rx="50"/></clipPath>
-            </defs>
-            <g clip-path="url(#cm)"><image href="${bg}" width="${cardWidth}" height="${h}" preserveAspectRatio="xMidYMid slice"/><rect width="${cardWidth}" height="${h}" fill="#111c" fill-opacity="0.75"/></g>
-            <g transform="translate(35,35)"><image href="${icon}" width="64" height="64" clip-path="url(#im)"/></g>
-            <text x="115" y="60" font-family="Arial" font-size="20" fill="#fff" font-weight="bold" class="sh">${ip}</text>
-            <text x="115" y="85" font-family="Arial" font-size="12" fill="#9399b2" class="sh">${isOnline?(d.version?.name_clean||"Java"):"N/A"}</text>
-            <rect x="${statusX}" y="40" width="105" height="28" rx="14" fill="#000" fill-opacity="0.5"/>
-            <text x="${statusTextX}" y="58" font-family="Arial" font-size="11" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${isOnline?d.players.online+' / '+d.players.max:'OFFLINE'}</text>
-            <foreignObject x="35" y="115" width="${contentW}" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
-            <text x="35" y="230" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
-            <foreignObject x="35" y="240" width="${contentW}" height="${Math.max((players.length||1)*22,30)}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
-            <text x="35" y="${h-45}" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">Ping: ${ping}ms</text>
-            <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">${time}</text>
-        </svg>`;
-        return new Response(svg, {headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-cache'}});
-    } catch(e) { return new Response("Error", {status:500}); }
-}
-
-// --- 网页渲染 ---
+// --- 主页 HTML ---
 function renderHTML(config) {
     const bg = config.bgImage || 'https://other.api.yilx.cc/api/moe';
     const title = config.title || '服务器状态';
@@ -282,20 +302,8 @@ button{background:#fff;color:#000;border:none;height:54px;border-radius:50px;fon
 <div id="confM" class="modal"><div class="m-box">
     <div class="m-t">设置</div>
     <div class="tab-box"><div class="tab active" onclick="sw(1)">基本</div><div class="tab" onclick="sw(2)">Telegram</div></div>
-    
-    <div id="t1">
-        <label class="m-l">网页标题</label><input id="c-ti" class="m-i" value="${title}">
-        <label class="m-l">背景图片 URL</label><input id="c-bg" class="m-i" value="${bg}">
-    </div>
-    
-    <div id="t2" style="display:none">
-        <label class="m-l">Bot Token</label><input id="tg-tk" class="m-i" type="password">
-        <label class="m-l">查询指令 (/m)</label><input id="tg-cmd" class="m-i">
-        <label class="m-l">自定义回复</label><div id="clist"></div>
-        <button onclick="addC()" style="background:#ffffff33;color:#fff;height:35px;font-size:14px;margin-top:5px">+ 添加</button>
-        <button onclick="hook()" style="background:#50a2ff;color:#fff;margin-top:20px;height:45px">🔗 绑定 Webhook</button>
-    </div>
-
+    <div id="t1"><label class="m-l">网页标题</label><input id="c-ti" class="m-i" value="${title}"><label class="m-l">背景图片 URL</label><input id="c-bg" class="m-i" value="${bg}"></div>
+    <div id="t2" style="display:none"><label class="m-l">Bot Token</label><input id="tg-tk" class="m-i" type="password"><label class="m-l">查询指令 (/m)</label><input id="tg-cmd" class="m-i"><label class="m-l">自定义回复</label><div id="clist"></div><button onclick="addC()" style="background:#ffffff33;color:#fff;height:35px;font-size:14px;margin-top:5px">+ 添加</button><button onclick="hook()" style="background:#50a2ff;color:#fff;margin-top:20px;height:45px">🔗 绑定 Webhook</button></div>
     <button onclick="save()" style="margin-top:20px;height:45px">保存</button>
     <div style="margin-top:15px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="closeM('confM')">关闭</div>
 </div></div>
