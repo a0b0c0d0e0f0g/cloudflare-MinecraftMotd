@@ -44,7 +44,6 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
-            // 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
@@ -54,7 +53,6 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 状态查询
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
@@ -130,7 +128,7 @@ async function sendTelegramPhoto(token, chatId, photo, caption) {
 }
 
 // ==========================================
-//           核心逻辑：生成 SVG 字符串
+//           核心逻辑：生成 SVG 字符串 (重构版)
 // ==========================================
 async function generateSvgString(serverIP, env) {
     const conf = await getConfig(env);
@@ -149,12 +147,62 @@ async function generateSvgString(serverIP, env) {
         ? players.map(p => `<div style="height:20px;color:#fff">${p.name_html || p.name_clean}</div>`).join("") 
         : '<div style="color:#fff;opacity:0.5">No players online</div>';
     
+    // --- 动态排版计算 ---
     const cardWidth = 460;
-    const contentW = 390; 
-    const statusX = 320;
-    const statusTextX = 372.5;
-    const h = 320 + Math.max((players.length||1)*22, 30);
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const paddingLeft = 115; // 左侧文字对齐线
+    let cursorY = 55; // 初始Y坐标
+
+    // 1. 计算 IP 换行
+    // 假设每个字符宽约 11px (Arial 20px Bold)，最大允许宽度约 310px -> 约 24 个字符
+    const maxIpChar = 24;
+    let ipLines = [];
+    if (serverIP.length > maxIpChar) {
+        ipLines.push(serverIP.substring(0, maxIpChar));
+        ipLines.push(serverIP.substring(maxIpChar)); // 简单的两行切分，超长可能截断
+    } else {
+        ipLines.push(serverIP);
+    }
+    
+    // 2. 生成 IP SVG
+    let ipSvg = "";
+    ipLines.forEach((line, i) => {
+        ipSvg += `<text x="${paddingLeft}" y="${cursorY}" font-family="Arial" font-size="20" fill="#fff" font-weight="bold" class="sh">${line}</text>`;
+        cursorY += 25; // 行高
+    });
+    
+    // 3. 在线人数状态框 (IP 下方)
+    cursorY += 5; // 间距
+    const statusText = isOnline ? `${d.players.online} / ${d.players.max}` : "OFFLINE";
+    // 动态宽度计算: 字符数 * 8.5px + 左右内边距 24px
+    const badgeWidth = Math.max(80, statusText.length * 8.5 + 24);
+    const badgeHeight = 26;
+    
+    const statusBadgeSvg = `
+        <rect x="${paddingLeft}" y="${cursorY - 18}" width="${badgeWidth}" height="${badgeHeight}" rx="13" fill="#000" fill-opacity="0.5"/>
+        <text x="${paddingLeft + badgeWidth/2}" y="${cursorY}" font-family="Arial" font-size="12" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${statusText}</text>
+    `;
+    cursorY += 25; // 移动光标
+
+    // 4. Ping (人数下方)
+    const pingSvg = `<text x="${paddingLeft}" y="${cursorY}" font-family="Arial" font-size="13" fill="#ffffffaa" class="sh">📶 Ping: ${ping}ms</text>`;
+    cursorY += 20;
+
+    // 5. Version (Ping 下方)
+    const versionStr = isOnline ? (d.version?.name_clean || "Java Edition") : "N/A";
+    const versionSvg = `<text x="${paddingLeft}" y="${cursorY}" font-family="Arial" font-size="13" fill="#9399b2" class="sh">ℹ️ ${versionStr}</text>`;
+    cursorY += 35; // 增加间距给 MOTD
+
+    // 6. 重新计算总高度 (基础高度 + 头部动态高度 + 玩家列表高度)
+    // 头部区域原本占用约 80px，现在根据 cursorY 动态计算
+    const headerHeight = cursorY; 
+    const playerAreaHeight = Math.max((players.length||1)*22, 30);
+    const motdAreaHeight = 85;
+    const footerHeight = 45;
+    
+    // 总高度
+    const h = headerHeight + motdAreaHeight + 35 + playerAreaHeight + footerHeight;
+
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -169,15 +217,16 @@ async function generateSvgString(serverIP, env) {
         </defs>
         <g clip-path="url(#cm)"><image href="${bg}" width="${cardWidth}" height="${h}" preserveAspectRatio="xMidYMid slice"/><rect width="${cardWidth}" height="${h}" fill="#111c" fill-opacity="0.75"/></g>
         <g transform="translate(35,35)"><image href="${icon}" width="64" height="64" clip-path="url(#im)"/></g>
-        <text x="115" y="60" font-family="Arial" font-size="20" fill="#fff" font-weight="bold" class="sh">${serverIP}</text>
-        <text x="115" y="85" font-family="Arial" font-size="12" fill="#9399b2" class="sh">${isOnline?(d.version?.name_clean||"Java"):"N/A"}</text>
-        <rect x="${statusX}" y="40" width="105" height="28" rx="14" fill="#000" fill-opacity="0.5"/>
-        <text x="${statusTextX}" y="58" font-family="Arial" font-size="11" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${isOnline?d.players.online+' / '+d.players.max:'OFFLINE'}</text>
-        <foreignObject x="35" y="115" width="${contentW}" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
-        <text x="35" y="230" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
-        <foreignObject x="35" y="240" width="${contentW}" height="${Math.max((players.length||1)*22,30)}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
         
-        <text x="35" y="${h-45}" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">Ping: ${ping}ms</text>
+        ${ipSvg}
+        ${statusBadgeSvg}
+        ${pingSvg}
+        ${versionSvg}
+
+        <foreignObject x="35" y="${headerHeight}" width="390" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
+        
+        <text x="35" y="${headerHeight + 115}" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
+        <foreignObject x="35" y="${headerHeight + 125}" width="390" height="${playerAreaHeight}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
         
         <text x="${cardWidth-35}" y="${h-60}" text-anchor="end" font-family="Arial" font-size="10" fill="#ffffffaa" class="sh">motd.a0b.de5.net</text>
         <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">${time}</text>
@@ -192,7 +241,7 @@ async function handleImageRequest(ip, env) {
     } catch(e) { return new Response("Error", {status:500}); }
 }
 
-// 模式 B: 返回纯 HTML 卡片 (供截图用，背景透明)
+// 模式 B: 返回纯 HTML 卡片
 async function handleHtmlCardRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
