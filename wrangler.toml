@@ -12,7 +12,7 @@ ENVIRONMENT = "production"
 
 [[kv_namespaces]]
 binding = "MOTD_KV"    # <--- 这里改成了 MOTD_KV
-id = "你的_KV_ID"      # 保持你创建的 KV ID 不变
+id = "MOTD_KV"      # 保持你创建的 KV ID 不变
 
 
 
