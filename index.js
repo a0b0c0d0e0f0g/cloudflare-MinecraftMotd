@@ -49,14 +49,10 @@ async function handleImageRequest(serverIP) {
     const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
     const statusColor = isOnline ? '#a6e3a1' : '#f38ba8';
 
-    // 修改：将宽度从 450 增加到 600
+    // 保持之前加宽的宽度
     const cardWidth = 600;
-    
-    // 计算右侧状态条的位置，保持右边距约 30px (600 - 105 - 30 = 465)
     const statusX = 465; 
-    const statusTextX = 517; // 465 + 105/2 ≈ 517
-    
-    // 计算内容区域宽度 (600 - 35 - 35 = 530)
+    const statusTextX = 517;
     const contentWidth = 530;
 
     const svg = `<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
@@ -64,14 +60,19 @@ async function handleImageRequest(serverIP) {
         <style>
           .shadow { text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
           .motd-container div { 
-            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-            overflow: hidden; white-space: pre-wrap; word-break: break-all; 
-            text-shadow: 1px 1px 2px rgba(0,0,0,1); font-family: -apple-system, Arial; line-height: 1.4;
+            display: block; /* 确保块级显示，利于换行 */
+            white-space: pre-wrap; /* 保留原始换行符，像原版 MC 一样 */
+            word-wrap: break-word; /* 单词过长才换行，不切断单词 */
+            overflow: hidden; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,1); 
+            font-family: -apple-system, Arial, sans-serif; 
+            line-height: 1.5; /* 增加行高，让两行区分更明显 */
+            max-height: 60px; /* 限制高度，防止溢出 */
           }
           .player-container div { display: block; font-family: -apple-system, Arial; text-shadow: 1px 1px 2px rgba(0,0,0,1); }
         </style>
         <clipPath id="iphone-mask">
-          <rect width="64" height="64" rx="16" />
+          <rect width="64" height="64" rx="22.5" />
         </clipPath>
         <clipPath id="card-mask">
           <rect width="${cardWidth}" height="${cardHeight}" rx="45" />
@@ -142,7 +143,8 @@ const htmlTemplate = `
             color: white;
         }
         
-        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 26px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
+        /* 修改：border-radius 从 26px 增加到 35px，使网站图标圆角更大 */
+        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 35px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
         h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
         p.desc { color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 12px 0 35px; }
         
