@@ -35,7 +35,9 @@ async function handleImageRequest(serverIP) {
     let playerHtml = "";
     let playerCount = 0;
     if (isOnline && data.players.list?.length > 0) {
-      const list = data.players.list.slice(0, 8);
+      // 修改：去掉了 .slice(0, 8)，现在会显示 API 返回的所有玩家
+      // 卡片高度将随玩家数量自动增加
+      const list = data.players.list; 
       playerCount = list.length;
       playerHtml = list.map(p => `<div style="height:22px; color:#ffffff;">${p.name_html || p.name_clean}</div>`).join("");
     } else {
@@ -43,8 +45,12 @@ async function handleImageRequest(serverIP) {
       playerCount = 1;
     }
 
+    // 计算玩家区域所需高度 (每行24px)
     const playerAreaHeight = Math.max(playerCount * 24, 30);
-    const cardHeight = 230 + playerAreaHeight;
+    
+    // 基础高度 255 (包含头部、MOTD等) + 玩家区域高度
+    const cardHeight = 255 + playerAreaHeight;
+    
     const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
     const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
     const statusColor = isOnline ? '#a6e3a1' : '#f38ba8';
@@ -59,21 +65,19 @@ async function handleImageRequest(serverIP) {
         <style>
           .shadow { text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
           
-          /* 修改部分开始：直接作用于 motd-container */
           .motd-container { 
             display: block;
-            white-space: pre-wrap; /* 关键：保留换行符和空格 */
-            word-wrap: break-word; /* 防止长单词溢出 */
+            white-space: pre-wrap;
+            word-wrap: break-word;
             overflow: hidden; 
             text-shadow: 1px 1px 2px rgba(0,0,0,1); 
             font-family: -apple-system, Arial, sans-serif; 
-            line-height: 1.5; 
-            max-height: 60px;
+            line-height: 1.4; 
+            max-height: 85px; 
             color: #ffffff;
             font-size: 16px;
           }
-          /* 移除之前的 .motd-container div 选择器，因为它可能匹配不到内容 */
-          
+          .motd-container span { display: inline; }
           .player-container div { display: block; font-family: -apple-system, Arial; text-shadow: 1px 1px 2px rgba(0,0,0,1); }
         </style>
         <clipPath id="iphone-mask">
@@ -101,14 +105,15 @@ async function handleImageRequest(serverIP) {
         ${isOnline ? data.players.online + ' / ' + data.players.max : 'OFFLINE'}
       </text>
 
-      <foreignObject x="35" y="115" width="${contentWidth}" height="60">
+      <foreignObject x="35" y="115" width="${contentWidth}" height="85">
         <div xmlns="http://www.w3.org/1999/xhtml" class="motd-container">
           ${motdHtml}
         </div>
       </foreignObject>
 
-      <text x="35" y="205" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="shadow">ONLINE PLAYERS</text>
-      <foreignObject x="35" y="215" width="${contentWidth}" height="${playerAreaHeight}">
+      <text x="35" y="230" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="shadow">ONLINE PLAYERS</text>
+      
+      <foreignObject x="35" y="240" width="${contentWidth}" height="${playerAreaHeight}">
         <div xmlns="http://www.w3.org/1999/xhtml" class="player-container" style="font-size:14px; line-height:1.6;">
           ${playerHtml}
         </div>
