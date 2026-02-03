@@ -49,7 +49,17 @@ async function handleImageRequest(serverIP) {
     const icon = (isOnline && data.icon) ? data.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
     const statusColor = isOnline ? '#a6e3a1' : '#f38ba8';
 
-    const svg = `<svg width="450" height="${cardHeight}" viewBox="0 0 450 ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
+    // 修改：将宽度从 450 增加到 600
+    const cardWidth = 600;
+    
+    // 计算右侧状态条的位置，保持右边距约 30px (600 - 105 - 30 = 465)
+    const statusX = 465; 
+    const statusTextX = 517; // 465 + 105/2 ≈ 517
+    
+    // 计算内容区域宽度 (600 - 35 - 35 = 530)
+    const contentWidth = 530;
+
+    const svg = `<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <style>
           .shadow { text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
@@ -64,13 +74,13 @@ async function handleImageRequest(serverIP) {
           <rect width="64" height="64" rx="16" />
         </clipPath>
         <clipPath id="card-mask">
-          <rect width="450" height="${cardHeight}" rx="45" />
+          <rect width="${cardWidth}" height="${cardHeight}" rx="45" />
         </clipPath>
       </defs>
       
       <g clip-path="url(#card-mask)">
-        <image href="${backgroundImage}" width="450" height="${cardHeight}" preserveAspectRatio="xMidYMid slice" />
-        <rect width="450" height="${cardHeight}" fill="#11111b" fill-opacity="0.75" />
+        <image href="${backgroundImage}" width="${cardWidth}" height="${cardHeight}" preserveAspectRatio="xMidYMid slice" />
+        <rect width="${cardWidth}" height="${cardHeight}" fill="#11111b" fill-opacity="0.75" />
       </g>
       
       <g transform="translate(35, 35)">
@@ -80,19 +90,19 @@ async function handleImageRequest(serverIP) {
       <text x="115" y="60" font-family="Arial" font-size="22" fill="#ffffff" font-weight="bold" class="shadow">${serverIP}</text>
       <text x="115" y="85" font-family="Arial" font-size="13" fill="#9399b2" class="shadow">${version}</text>
       
-      <rect x="315" y="40" width="105" height="28" rx="14" fill="#000000" fill-opacity="0.5"/>
-      <text x="367" y="58" font-family="Arial" font-size="12" font-weight="bold" fill="${statusColor}" text-anchor="middle" class="shadow">
+      <rect x="${statusX}" y="40" width="105" height="28" rx="14" fill="#000000" fill-opacity="0.5"/>
+      <text x="${statusTextX}" y="58" font-family="Arial" font-size="12" font-weight="bold" fill="${statusColor}" text-anchor="middle" class="shadow">
         ${isOnline ? data.players.online + ' / ' + data.players.max : 'OFFLINE'}
       </text>
 
-      <foreignObject x="35" y="115" width="380" height="60">
+      <foreignObject x="35" y="115" width="${contentWidth}" height="60">
         <div xmlns="http://www.w3.org/1999/xhtml" class="motd-container" style="color:#ffffff; font-size:16px;">
           ${motdHtml}
         </div>
       </foreignObject>
 
       <text x="35" y="205" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="shadow">ONLINE PLAYERS</text>
-      <foreignObject x="35" y="215" width="380" height="${playerAreaHeight}">
+      <foreignObject x="35" y="215" width="${contentWidth}" height="${playerAreaHeight}">
         <div xmlns="http://www.w3.org/1999/xhtml" class="player-container" style="font-size:14px; line-height:1.6;">
           ${playerHtml}
         </div>
@@ -124,20 +134,24 @@ const htmlTemplate = `
             background: rgba(255, 255, 255, 0.15); 
             backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
             padding: 45px 35px; 
-            border-radius: 50px; /* iPhone 连续曲率风格 */
-            width: 85%; max-width: 460px; text-align: center; 
+            border-radius: 50px; 
+            width: calc(100% - 40px);
+            max-width: 460px; text-align: center; 
             box-shadow: 0 25px 50px rgba(0,0,0,0.4);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
         }
         
-        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 20px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
+        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 26px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
         h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
         p.desc { color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 12px 0 35px; }
         
         textarea { 
-            width: 100%; min-height: 54px; padding: 18px; margin-bottom: 18px; 
-            border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); 
+            width: 100%; min-height: 54px; 
+            padding: 18px 25px;
+            margin-bottom: 18px; 
+            border-radius: 50px; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
             background: rgba(0, 0, 0, 0.25); color: white; 
             box-sizing: border-box; font-size: 17px; font-family: inherit;
             outline: none; resize: none; overflow: hidden; display: block;
@@ -147,7 +161,8 @@ const htmlTemplate = `
         
         button { 
             background: white; color: #000; border: none; height: 54px; 
-            border-radius: 20px; font-weight: 700; cursor: pointer; 
+            border-radius: 50px; 
+            font-weight: 700; cursor: pointer; 
             width: 100%; font-size: 17px; transition: all 0.4s cubic-bezier(0.15, 0, 0.2, 1);
         }
         button:hover { background: #eee; transform: scale(1.02); }
@@ -156,7 +171,7 @@ const htmlTemplate = `
         #res { margin-top: 40px; width: 100%; }
         #full-motd-box { 
             margin-top: 25px; padding: 22px; background: rgba(0,0,0,0.45); 
-            border-radius: 50px; /* 修改：将圆角从 28px 改为 50px 以统一风格 */
+            border-radius: 50px;
             text-align: left; display: none; 
             border: 1px solid rgba(255,255,255,0.08);
         }
