@@ -35,8 +35,6 @@ async function handleImageRequest(serverIP) {
     let playerHtml = "";
     let playerCount = 0;
     if (isOnline && data.players.list?.length > 0) {
-      // 修改：去掉了 .slice(0, 8)，现在会显示 API 返回的所有玩家
-      // 卡片高度将随玩家数量自动增加
       const list = data.players.list; 
       playerCount = list.length;
       playerHtml = list.map(p => `<div style="height:22px; color:#ffffff;">${p.name_html || p.name_clean}</div>`).join("");
@@ -45,10 +43,7 @@ async function handleImageRequest(serverIP) {
       playerCount = 1;
     }
 
-    // 计算玩家区域所需高度 (每行24px)
     const playerAreaHeight = Math.max(playerCount * 24, 30);
-    
-    // 基础高度 255 (包含头部、MOTD等) + 玩家区域高度
     const cardHeight = 255 + playerAreaHeight;
     
     const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
@@ -60,11 +55,11 @@ async function handleImageRequest(serverIP) {
     const statusTextX = 517;
     const contentWidth = 530;
 
+    // 修改重点：去掉了 ${motdHtml} 周围的空格和换行
     const svg = `<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <style>
           .shadow { text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
-          
           .motd-container { 
             display: block;
             white-space: pre-wrap;
@@ -106,9 +101,7 @@ async function handleImageRequest(serverIP) {
       </text>
 
       <foreignObject x="35" y="115" width="${contentWidth}" height="85">
-        <div xmlns="http://www.w3.org/1999/xhtml" class="motd-container">
-          ${motdHtml}
-        </div>
+        <div xmlns="http://www.w3.org/1999/xhtml" class="motd-container">${motdHtml}</div>
       </foreignObject>
 
       <text x="35" y="230" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="shadow">ONLINE PLAYERS</text>
