@@ -44,6 +44,7 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
+            // 1. 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
@@ -53,6 +54,7 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
+            // 2. 状态查询
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
@@ -192,7 +194,7 @@ async function generateSvgString(serverIP, env) {
     const playerAreaHeight = Math.max((players.length||1)*22, 30);
     const h = headerHeight + 85 + 35 + playerAreaHeight + 45;
 
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -303,10 +305,16 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 .logo{width:85px;height:85px;margin-bottom:25px;border-radius:35px;box-shadow:0 12px 24px rgba(0,0,0,0.3)}
 h2{margin:0;font-size:26px;font-weight:800}p.d{color:#ffffffb3;font-size:15px;margin:12px 0 35px}
 
-/* 立体 UI 风格 */
+/* 立体 UI 风格 - 还原输入框尺寸 */
+.input-wrapper {
+    position: relative;
+    border-radius: 50px; /* 还原为 50px */
+    overflow: hidden;
+    margin-bottom: 18px;
+}
 textarea {
     width:100%; min-height:54px; padding:18px 25px; 
-    border-radius:20px; /* 还原圆角 */
+    border-radius:50px; /* 还原为 50px */
     font-size:17px; 
     background:rgba(0,0,0,0.25); 
     border:1px solid rgba(255,255,255,0.1); 
@@ -316,6 +324,7 @@ textarea {
     /* 凹陷立体感 */
     box-shadow: inset 0 3px 6px rgba(0,0,0,0.4), inset 0 0 2px rgba(0,0,0,0.6);
     backdrop-filter: blur(10px);
+    display: block;
 }
 textarea::-webkit-scrollbar{display:none}
 
@@ -325,10 +334,11 @@ button {
     height: 54px; width: 100%; 
     border-radius: 50px;
     font-weight: 700; font-size: 17px; cursor: pointer;
-    margin-top: 15px;
     /* 凸起立体感 */
     box-shadow: 0 6px 15px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.05);
     transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
 }
 button:active { 
     transform: translateY(3px); 
@@ -362,7 +372,7 @@ button:active {
     <div class="set-btn" onclick="openSet()">⚙️</div>
     <img src="https://ib.a0b.de5.net/file/1770001024571_2307052_Mvie09JU.png" class="logo">
     <h2>${title}</h2><p class="d">输入Minecraft服务器地址，一键获取</p>
-    <div class="input-group">
+    <div class="input-wrapper">
         <textarea id="ip" placeholder="play.hypixel.net" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'"></textarea>
     </div>
     <button onclick="gen()">生成预览卡片</button>
