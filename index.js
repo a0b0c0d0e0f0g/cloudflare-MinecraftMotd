@@ -165,7 +165,7 @@ async function handleImageRequest(ip, env) {
         const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:22px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
         
         const h = 320 + Math.max((players.length||1)*24, 30);
-        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
+        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
 
         const svg = `<svg width="600" height="${h}" viewBox="0 0 600 ${h}" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -192,7 +192,6 @@ async function handleImageRequest(ip, env) {
 function renderHTML(config) {
     const bg = config.bgImage || 'https://other.api.yilx.cc/api/moe';
     const title = config.title || '服务器状态';
-    // 安全转义 JSON，防止 XSS 或脚本崩溃
     const tgConfigSafe = JSON.stringify(config.telegram || {customCommands:[]}).replace(/</g, '\\u003c');
 
     return `<!DOCTYPE html>
@@ -305,7 +304,11 @@ async function gen(){
     const i=new Image();i.className='card-img';i.src=location.origin+'?server='+encodeURIComponent(ip);
     i.onload=()=>{r.innerHTML='';r.appendChild(i)};
     const d=await(await fetch(location.origin+'?type=info&server='+encodeURIComponent(ip))).json();
-    if(d.online){document.getElementById('full-box').style.display='block';document.getElementById('full-con').innerText=d.motd}
+    if(d.online){
+        document.getElementById('full-box').style.display='block';
+        // 修复点：使用 innerHTML 而不是 innerText
+        document.getElementById('full-con').innerHTML=d.motd;
+    }
 }
 </script>
 </body></html>`;
