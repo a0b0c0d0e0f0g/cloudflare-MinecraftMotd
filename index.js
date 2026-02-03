@@ -26,7 +26,9 @@ export default {
   }
 };
 
-// --- Telegram 逻辑 ---
+// ==========================================
+//           Telegram 核心逻辑 (修复版)
+// ==========================================
 async function handleTelegramWebhook(request, env) {
     const config = await getConfig(env);
     const tgConfig = config.telegram || {};
@@ -39,55 +41,89 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
+            // 1. 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
-                        await sendTelegramMessage(token, chatId, cmdObj.reply, "Markdown");
+                        await sendTelegramMessage(token, chatId, cmdObj.reply, "MarkdownV2");
                         return new Response("OK");
                     }
                 }
             }
 
-            const statusCmd = tgConfig.statusCmd || "/m";
+            // 2. 状态查询 (默认 /motd)
+            const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
-            if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
-            else if (text === statusCmd) {
-                await sendTelegramMessage(token, chatId, "请使用: `" + statusCmd + " IP`", "Markdown");
+            
+            if (text.startsWith(statusCmd + " ")) {
+                serverIP = text.substring(statusCmd.length + 1).trim();
+            } else if (text === statusCmd) {
+                await sendTelegramMessage(token, chatId, `请使用: \`${statusCmd} <IP>\``, "MarkdownV2");
                 return new Response("OK");
             }
 
             if (serverIP) {
-                const data = await fetchMinecraftStatus(serverIP);
-                if (!data.online) {
-                    await sendTelegramMessage(token, chatId, `🔴 *${serverIP}* 离线`, "Markdown");
-                } else {
-                    const workerUrl = new URL(request.url).origin;
-                    const cardUrl = `${workerUrl}/?server=${encodeURIComponent(serverIP)}`;
-                    const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
+                try {
+                    const data = await fetchMinecraftStatus(serverIP);
                     
-                    const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-                    const caption = `🟢 *${serverIP}* 在线\n👥: \`${data.players.online}/${data.players.max}\`\nℹ️: ${data.version.name_clean}\n📝: ${cleanMotd}`;
-                    
-                    await sendTelegramPhoto(token, chatId, screenshotUrl, caption);
+                    // 辅助转义函数：防止 MarkdownV2 报错
+                    const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+
+                    if (!data.online) {
+                        const msg = `🔴 *${esc(serverIP)}* 离线`;
+                        await sendTelegramMessage(token, chatId, msg, "MarkdownV2");
+                    } else {
+                        const workerUrl = new URL(request.url).origin;
+                        const cardUrl = `${workerUrl}/?server=${encodeURIComponent(serverIP)}`;
+                        // 截图宽度 460，增加时间戳防缓存
+                        const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
+                        
+                        const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&'); // MOTD 单独处理
+                        
+                        const caption = `🟢 *${esc(serverIP)}* 在线\n` +
+                                        `👥 人数: \`${esc(data.players.online)}/${esc(data.players.max)}\`\n` +
+                                        `ℹ️ 版本: ${esc(data.version.name_clean)}\n` +
+                                        `📝 MOTD: ${cleanMotd}`;
+                        
+                        await sendTelegramPhoto(token, chatId, screenshotUrl, caption);
+                    }
+                } catch (err) {
+                    // 发生错误时通知用户，而不是沉默
+                    await sendTelegramMessage(token, chatId, `❌ 查询出错: ${err.message || "Unknown Error"}`, null);
                 }
             }
         }
         return new Response("OK");
-    } catch (e) { return new Response("Error", { status: 200 }); }
+    } catch (e) {
+        return new Response("Error", { status: 200 });
+    }
 }
 
 async function sendTelegramMessage(token, chatId, text, parseMode) {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const payload = { chat_id: chatId, text: text };
+    if (parseMode) payload.parse_mode = parseMode;
+    
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text, parse_mode: parseMode })
+        body: JSON.stringify(payload)
     });
+    // 检查响应，如果报错抛出异常以便捕获
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.description);
 }
 
 async function sendTelegramPhoto(token, chatId, photo, caption) {
-    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, photo, caption, parse_mode: 'Markdown' })
+        body: JSON.stringify({ 
+            chat_id: chatId, 
+            photo: photo, 
+            caption: caption, 
+            parse_mode: 'MarkdownV2' 
+        })
     });
+    const data = await res.json();
+    if (!data.ok) throw new Error("发图失败: " + data.description);
 }
 
 // --- 配置逻辑 ---
@@ -159,14 +195,13 @@ async function handleImageRequest(ip, env) {
         const players = (isOnline && d.players.list) ? d.players.list : [];
         const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:20px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
         
-        // 关键修改：宽度严格设为 460，与按钮一致
         const cardWidth = 460;
         const contentW = 390; 
         const statusX = 320;
         const statusTextX = 372.5;
 
         const h = 320 + Math.max((players.length||1)*22, 30);
-        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
         const svg = `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -209,9 +244,8 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 .logo{width:85px;height:85px;margin-bottom:25px;border-radius:35px;box-shadow:0 12px 24px rgba(0,0,0,0.3)}
 h2{margin:0;font-size:26px;font-weight:800}p.d{color:#ffffffb3;font-size:15px;margin:12px 0 35px}
 input,textarea,button{font-family:inherit;outline:none;box-sizing:border-box;border-radius:20px}
-/* 修改：隐藏滚动条 */
-textarea{width:100%;min-height:54px;padding:18px 25px;margin-bottom:18px;border-radius:50px;font-size:17px;background:#00000040;border:1px solid #ffffff1a;color:#fff;scrollbar-width:none;-ms-overflow-style:none;}
-textarea::-webkit-scrollbar{display:none;}
+textarea{width:100%;min-height:54px;padding:18px 25px;margin-bottom:18px;border-radius:50px;font-size:17px;background:#00000040;border:1px solid #ffffff1a;color:#fff;scrollbar-width:none;-ms-overflow-style:none}
+textarea::-webkit-scrollbar{display:none}
 button{background:#fff;color:#000;border:none;height:54px;border-radius:50px;font-weight:700;width:100%;font-size:17px;cursor:pointer}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#00000099;backdrop-filter:blur(8px);align-items:center;justify-content:center;z-index:100}
 .m-box{background:#1e1e23f2;padding:25px;border-radius:40px;width:90%;max-width:350px;text-align:left;color:#fff;max-height:85vh;overflow-y:auto;border:1px solid #ffffff1a}
@@ -274,7 +308,7 @@ function showConf(){
     document.getElementById('loginM').style.display='none';
     document.getElementById('confM').style.display='flex';
     document.getElementById('tg-tk').value = tg.token||'';
-    document.getElementById('tg-cmd').value = tg.statusCmd||'/m';
+    document.getElementById('tg-cmd').value = tg.statusCmd||'/motd';
     renderC();
 }
 function sw(n){
