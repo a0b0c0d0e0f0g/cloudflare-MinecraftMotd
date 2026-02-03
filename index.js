@@ -63,7 +63,8 @@ async function handleTelegramWebhook(request, env) {
                 } else {
                     const workerUrl = new URL(request.url).origin;
                     const cardUrl = `${workerUrl}/?server=${encodeURIComponent(serverIP)}`;
-                    const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=400&t=${Date.now()}`;
+                    // 截图宽度改为 460 以匹配新设计
+                    const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
                     
                     const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
                     const caption = `🟢 *${serverIP}* 在线\n👥: \`${data.players.online}/${data.players.max}\`\nℹ️: ${data.version.name_clean}\n📝: ${cleanMotd}`;
@@ -143,7 +144,7 @@ async function handleInfoRequest(ip) {
     return new Response(JSON.stringify({motd:d.motd?.html||"", online:d.online}), {headers:{'Content-Type':'application/json'}});
 }
 
-// --- 图片生成 (重点修改部分) ---
+// --- 图片生成 (调整核心) ---
 async function handleImageRequest(ip, env) {
     const conf = await getConfig(env);
     const bg = conf.bgImage || `https://other.api.yilx.cc/api/moe?t=${Date.now()}`;
@@ -157,40 +158,51 @@ async function handleImageRequest(ip, env) {
         const isOnline = d.online;
         const motd = isOnline ? (d.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
         const players = (isOnline && d.players.list) ? d.players.list : [];
-        const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:22px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
+        const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:20px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
         
-        // 修改：将宽度从 600 改为 400，以匹配手机端视觉比例
-        const cardWidth = 400;
+        // 修改：卡片宽度设为 460，与 CSS .box max-width 一致
+        const cardWidth = 460;
         
-        // 重新计算坐标
-        // 400 (宽) - 105 (徽章宽) - 30 (右边距) = 265
-        const statusX = 265; 
-        const statusTextX = 317.5; 
-        
-        // 400 - 35(左) - 35(右) = 330
-        const contentWidth = 330; 
+        // 布局计算 (左右边距 35px)
+        const contentW = 460 - 70; // 390
+        // 右上角状态条: 宽 105, 右边距 35 -> x = 460-35-105 = 320
+        const statusX = 320;
+        const statusTextX = 320 + 52.5;
 
-        // 高度计算保持不变
-        const h = 320 + Math.max((players.length||1)*24, 30);
+        // 高度计算
+        const h = 320 + Math.max((players.length||1)*22, 30);
         
-        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vvWv995679973vu+973vv+973vvfdf8F937vve9/77vvf9/8D933vuv9XvPfuu/997/ve973v/Xf8N9733ve+973vvfd973vv+/8N9733ve+97/9v/wXv/f8A/33/vf8N/73vvve9773vve+973vv/Rfe+89/33/ve99733vve+99733f/xd8N9733ve+973v";
+        const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
         const svg = `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
             <defs>
-                <style>.sh{text-shadow:1px 1px 2px rgba(0,0,0,0.8)}.mc{display:block;white-space:pre-wrap;word-wrap:break-word;overflow:hidden;text-shadow:1px 1px 2px #000;font-family:sans-serif;line-height:1.4;max-height:85px;color:#fff;font-size:16px}.mc span{display:inline}.pc div{display:block;font-family:sans-serif;text-shadow:1px 1px 2px #000}</style>
-                <clipPath id="im"><rect width="64" height="64" rx="22.5"/></clipPath><clipPath id="cm"><rect width="${cardWidth}" height="${h}" rx="45"/></clipPath>
+                <style>
+                    .sh{text-shadow:1px 1px 2px rgba(0,0,0,0.8)}
+                    /* 字体调整：IP 20px, MOTD 14px */
+                    .mc{display:block;white-space:pre-wrap;word-wrap:break-word;overflow:hidden;text-shadow:1px 1px 2px #000;font-family:sans-serif;line-height:1.4;max-height:85px;color:#fff;font-size:14px}
+                    .mc span{display:inline}
+                    /* 玩家列表 12px */
+                    .pc div{display:block;font-family:sans-serif;text-shadow:1px 1px 2px #000;font-size:12px}
+                </style>
+                <clipPath id="im"><rect width="64" height="64" rx="22.5"/></clipPath>
+                <clipPath id="cm"><rect width="${cardWidth}" height="${h}" rx="50"/></clipPath>
             </defs>
             <g clip-path="url(#cm)"><image href="${bg}" width="${cardWidth}" height="${h}" preserveAspectRatio="xMidYMid slice"/><rect width="${cardWidth}" height="${h}" fill="#111c" fill-opacity="0.75"/></g>
             <g transform="translate(35,35)"><image href="${icon}" width="64" height="64" clip-path="url(#im)"/></g>
-            <text x="115" y="60" font-family="Arial" font-size="22" fill="#fff" font-weight="bold" class="sh">${ip}</text>
-            <text x="115" y="85" font-family="Arial" font-size="13" fill="#9399b2" class="sh">${isOnline?(d.version?.name_clean||"Java"):"N/A"}</text>
+            
+            <text x="115" y="60" font-family="Arial" font-size="20" fill="#fff" font-weight="bold" class="sh">${ip}</text>
+            <text x="115" y="85" font-family="Arial" font-size="12" fill="#9399b2" class="sh">${isOnline?(d.version?.name_clean||"Java"):"N/A"}</text>
+            
             <rect x="${statusX}" y="40" width="105" height="28" rx="14" fill="#000" fill-opacity="0.5"/>
-            <text x="${statusTextX}" y="58" font-family="Arial" font-size="12" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${isOnline?d.players.online+' / '+d.players.max:'OFFLINE'}</text>
-            <foreignObject x="35" y="115" width="${contentWidth}" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
+            <text x="${statusTextX}" y="58" font-family="Arial" font-size="11" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${isOnline?d.players.online+' / '+d.players.max:'OFFLINE'}</text>
+            
+            <foreignObject x="35" y="115" width="${contentW}" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
+            
             <text x="35" y="230" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
-            <foreignObject x="35" y="240" width="${contentWidth}" height="${Math.max((players.length||1)*24,30)}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:14px;line-height:1.6">${pListHtml}</div></foreignObject>
-            <text x="35" y="${h-45}" font-family="Arial" font-size="12" fill="#ffffffaa" class="sh">Ping: ${ping}ms</text>
-            <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="12" fill="#ffffffaa" class="sh">${time}</text>
+            <foreignObject x="35" y="240" width="${contentW}" height="${Math.max((players.length||1)*22,30)}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
+            
+            <text x="35" y="${h-45}" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">Ping: ${ping}ms</text>
+            <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">${time}</text>
         </svg>`;
         return new Response(svg, {headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-cache'}});
     } catch(e) { return new Response("Error", {status:500}); }
