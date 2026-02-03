@@ -1,6 +1,12 @@
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // --- 管理员登录 API ---
+    if (url.pathname === '/api/login' && request.method === 'POST') {
+        return handleAuthLogin(request, env);
+    }
+
     const serverIP = url.searchParams.get("server");
     if (!serverIP) {
       return new Response(htmlTemplate, { headers: { "Content-Type": "text/html;charset=UTF-8" } });
@@ -11,6 +17,36 @@ export default {
     return handleImageRequest(serverIP);
   }
 };
+
+// --- 处理登录逻辑 (使用 MOTD_KV) ---
+async function handleAuthLogin(request, env) {
+    try {
+        const body = await request.json();
+        
+        // 检查 MOTD_KV 是否绑定
+        if (!env.MOTD_KV) {
+            return new Response(JSON.stringify({ success: false, msg: "服务端 KV (MOTD_KV) 未配置" }), { status: 500 });
+        }
+
+        // 从 MOTD_KV 获取账号密码
+        const dbUser = await env.MOTD_KV.get("ADMIN_USER");
+        const dbPass = await env.MOTD_KV.get("ADMIN_PASS");
+
+        // 验证
+        if (body.username === dbUser && body.password === dbPass) {
+            return new Response(JSON.stringify({ success: true }), { 
+                headers: { "Content-Type": "application/json" } 
+            });
+        } else {
+            return new Response(JSON.stringify({ success: false, msg: "账号或密码错误" }), { 
+                status: 401,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+    } catch (e) {
+        return new Response(JSON.stringify({ success: false, msg: "服务器错误" }), { status: 500 });
+    }
+}
 
 async function handleInfoRequest(serverIP) {
     const apiUrl = `https://api.mcstatus.io/v2/status/java/${encodeURIComponent(serverIP)}`;
@@ -24,27 +60,21 @@ async function handleInfoRequest(serverIP) {
 
 async function handleImageRequest(serverIP) {
   const apiUrl = `https://api.mcstatus.io/v2/status/java/${encodeURIComponent(serverIP)}`;
+  // 背景图 API，可按需修改
   const backgroundImage = `https://other.api.yilx.cc/api/moe?t=${Date.now()}`; 
 
   try {
-    // 1. 开始计时 (用于计算 Ping)
     const startTime = Date.now();
     
     const res = await fetch(apiUrl, { cf: { cacheTtl: 60 } });
     const data = await res.json();
     
-    // 1. 结束计时，计算 Ping (API 延迟)
     const ping = Date.now() - startTime;
 
-    // 2. 获取北京时间 (精确到秒)
     const timeFormatter = new Intl.DateTimeFormat('zh-CN', {
         timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
         hour12: false
     });
     const timeStr = timeFormatter.format(new Date()).replace(/\//g, '-'); 
@@ -64,8 +94,7 @@ async function handleImageRequest(serverIP) {
     }
 
     const playerAreaHeight = Math.max(playerCount * 24, 30);
-    
-    // 3. 修改高度：基础高度从 290 增加到 320，底部多留出约 30px 空白
+    // 基础高度 320，底部留白
     const cardHeight = 320 + playerAreaHeight;
     
     const version = isOnline ? (data.version?.name_clean || "Java Edition") : "N/A";
@@ -169,6 +198,7 @@ const htmlTemplate = `
             box-shadow: 0 25px 50px rgba(0,0,0,0.4);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
+            position: relative; 
         }
         
         .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 35px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
@@ -208,7 +238,36 @@ const htmlTemplate = `
         #full-motd-content { line-height: 1.7; font-size: 14px; white-space: pre-wrap; }
         
         img.card-img { width: 100%; border-radius: 45px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        
         .footer { margin-top: 35px; font-size: 13px; opacity: 0.4; font-weight: 500; }
+        .admin-link { cursor: pointer; text-decoration: none; color: inherit; transition: 0.2s; }
+        .admin-link:hover { text-decoration: underline; opacity: 1; }
+
+        /* --- 登录弹窗样式 --- */
+        .modal {
+            display: none; 
+            position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: rgba(30, 30, 35, 0.9);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 35px; border-radius: 40px; width: 85%; max-width: 320px;
+            text-align: center; color: white;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 25px; }
+        .modal-input {
+            width: 100%; padding: 15px 20px; margin-bottom: 15px;
+            border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3); color: white; outline: none; box-sizing: border-box;
+        }
+        .modal-btn {
+            background: #fff; color: #000; border-radius: 30px; 
+            padding: 12px; width: 100%; font-weight: bold; border: none; cursor: pointer;
+        }
+        .close-btn { margin-top: 15px; font-size: 13px; color: #aaa; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -227,8 +286,22 @@ const htmlTemplate = `
             <div id="full-motd-content"></div>
         </div>
 
-        <div class="footer">© 2026 MC Status Card • iOS Style</div>
+        <div class="footer">
+            © 2026 MC Status Card • iOS Style <br>
+            <span id="admin-status" class="admin-link" onclick="openLogin()">管理员登录</span>
+        </div>
     </div>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">管理员登录</div>
+            <input type="text" id="username" class="modal-input" placeholder="账号">
+            <input type="password" id="password" class="modal-input" placeholder="密码">
+            <button class="modal-btn" onclick="doLogin()">登 录</button>
+            <div class="close-btn" onclick="closeLogin()">取消</div>
+        </div>
+    </div>
+
     <script>
         async function gen() {
             const ip = document.getElementById('ip').value.trim();
@@ -252,6 +325,42 @@ const htmlTemplate = `
                     document.getElementById('full-motd-content').innerHTML = infoData.motd;
                 }
             } catch(e) {}
+        }
+
+        // --- 登录脚本 ---
+        const modal = document.getElementById('loginModal');
+        const adminStatus = document.getElementById('admin-status');
+
+        function openLogin() {
+            if (adminStatus.innerText === '管理员已登录') return;
+            modal.style.display = 'flex';
+        }
+        function closeLogin() { modal.style.display = 'none'; }
+        
+        async function doLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if(!u || !p) return alert("请输入账号和密码");
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p})
+                });
+                const data = await res.json();
+                if(data.success) {
+                    alert('登录成功');
+                    closeLogin();
+                    adminStatus.innerText = '管理员已登录';
+                    adminStatus.style.color = '#a6e3a1';
+                    adminStatus.style.cursor = 'default';
+                } else {
+                    alert('登录失败: ' + (data.msg || '未知错误'));
+                }
+            } catch(e) {
+                alert('请求错误，请检查网络或 KV 配置');
+            }
         }
     </script>
 </body>
