@@ -44,7 +44,6 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
-            // 1. 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
@@ -54,7 +53,6 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 2. 状态查询
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
@@ -130,7 +128,7 @@ async function sendTelegramPhoto(token, chatId, photo, caption) {
 }
 
 // ==========================================
-//           核心逻辑：生成 SVG 字符串
+//           核心逻辑：生成 SVG 字符串 (布局重构)
 // ==========================================
 async function generateSvgString(serverIP, env) {
     const conf = await getConfig(env);
@@ -150,51 +148,68 @@ async function generateSvgString(serverIP, env) {
         : '<div style="color:#fff;opacity:0.5">No players online</div>';
     
     const cardWidth = 460;
-    const paddingLeft = 115; 
-    const rightAnchor = 425; 
+    const paddingLeft = 115; // 左侧 IP 对齐线
+    const rightAnchor = 425; // 右侧数据对齐线 (460 - 35)
 
-    // --- 动态排版 ---
+    // --- 1. 右上角状态数据 (在线人数 -> Ping -> 版本) ---
     let statsSvg = "";
+    // 基准 Y 坐标
     let statsY = 48; 
 
+    // A. 在线人数 (黑框胶囊)
     const statusText = isOnline ? `${d.players.online}/${d.players.max}` : "OFFLINE";
+    // 计算宽度：字符数 * 9px + 内边距 24px (最小70)
     const badgeWidth = Math.max(70, statusText.length * 9 + 24);
     const badgeHeight = 26;
+    // 胶囊位置：从右向左推
     const badgeX = rightAnchor - badgeWidth;
     
     statsSvg += `
         <rect x="${badgeX}" y="${statsY - 18}" width="${badgeWidth}" height="${badgeHeight}" rx="13" fill="#000" fill-opacity="0.5"/>
         <text x="${badgeX + badgeWidth/2}" y="${statsY}" font-family="Arial" font-size="12" font-weight="bold" fill="${isOnline?'#a6e3a1':'#f38ba8'}" text-anchor="middle" class="sh">${statusText}</text>
     `;
-    statsY += 24; 
+    statsY += 24; // 下移
+
+    // B. Ping (右对齐，无 Emoji)
     statsSvg += `<text x="${rightAnchor}" y="${statsY}" font-family="Arial" font-size="12" fill="#ffffffaa" text-anchor="end" class="sh">${ping}ms</text>`;
-    statsY += 18; 
+    statsY += 18; // 下移
+
+    // C. 版本 (右对齐，无 Emoji)
     const versionStr = isOnline ? (d.version?.name_clean || "Java") : "N/A";
     statsSvg += `<text x="${rightAnchor}" y="${statsY}" font-family="Arial" font-size="12" fill="#9399b2" text-anchor="end" class="sh">${versionStr}</text>`;
 
+    // --- 2. 左侧 IP (支持换行) ---
+    // IP 最大可用宽度 = 胶囊左边缘(badgeX) - 左对齐线(paddingLeft) - 间距(10)
     const maxIpWidthPixels = badgeX - paddingLeft - 10;
+    // 估算每字符宽度约 11px
     const maxIpChar = Math.floor(maxIpWidthPixels / 11); 
     
     let ipLines = [];
-    if (serverIP.length > maxIpChar && maxIpChar > 5) { 
+    if (serverIP.length > maxIpChar && maxIpChar > 5) { // 只有空间足够才换行，防止太窄出错
         ipLines.push(serverIP.substring(0, maxIpChar));
         ipLines.push(serverIP.substring(maxIpChar));
     } else {
         ipLines.push(serverIP);
     }
 
-    let ipY = 60;
+    let ipY = 60; // IP 起始 Y
     let ipSvg = "";
     ipLines.forEach(line => {
         ipSvg += `<text x="${paddingLeft}" y="${ipY}" font-family="Arial" font-size="20" fill="#fff" font-weight="bold" class="sh">${line}</text>`;
-        ipY += 25; 
+        ipY += 25; // 行高
     });
 
-    const headerHeight = Math.max(statsY + 10, ipY + 10, 115);
+    // --- 3. 布局高度计算 ---
+    // 头部高度取决于：右侧统计高度 vs 左侧 IP 高度
+    const headerHeight = Math.max(statsY + 10, ipY + 10, 115); // 至少保留 115 高度
+    
     const playerAreaHeight = Math.max((players.length||1)*22, 30);
-    const h = headerHeight + 85 + 35 + playerAreaHeight + 45;
-
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const motdHeight = 85;
+    const footerHeight = 45;
+    
+    // 总高度
+    const h = headerHeight + motdHeight + 35 + playerAreaHeight + footerHeight;
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -215,8 +230,8 @@ async function generateSvgString(serverIP, env) {
 
         <foreignObject x="35" y="${headerHeight}" width="390" height="85"><div xmlns="http://www.w3.org/1999/xhtml" class="mc">${motd}</div></foreignObject>
         
-        <text x="35" y="${headerHeight + 95}" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
-        <foreignObject x="35" y="${headerHeight + 105}" width="390" height="${playerAreaHeight}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
+        <text x="35" y="${headerHeight + 115}" font-family="Arial" font-size="11" fill="#94e2d5" font-weight="bold" style="letter-spacing:1.5px" class="sh">ONLINE PLAYERS</text>
+        <foreignObject x="35" y="${headerHeight + 125}" width="390" height="${playerAreaHeight}"><div xmlns="http://www.w3.org/1999/xhtml" class="pc" style="font-size:12px;line-height:1.6">${pListHtml}</div></foreignObject>
         
         <text x="${cardWidth-35}" y="${h-60}" text-anchor="end" font-family="Arial" font-size="10" fill="#ffffffaa" class="sh">motd.a0b.de5.net</text>
         <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">${time}</text>
@@ -231,7 +246,7 @@ async function handleImageRequest(ip, env) {
     } catch(e) { return new Response("Error", {status:500}); }
 }
 
-// 模式 B: 返回纯 HTML 卡片
+// 模式 B: 返回纯 HTML 卡片 (供截图用)
 async function handleHtmlCardRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
@@ -261,6 +276,7 @@ async function handleInfoRequest(ip) {
     const d = await fetchMinecraftStatus(ip);
     return new Response(JSON.stringify({motd:d.motd?.html||"", online:d.online}), {headers:{'Content-Type':'application/json'}});
 }
+// API Handlers
 async function handleGetConfig(env) {
     return new Response(JSON.stringify(await getConfig(env)), {headers:{'Content-Type':'application/json'}});
 }
@@ -286,7 +302,7 @@ async function handleAuthLogin(req, env) {
     return new Response('{"success":false}', {status:401});
 }
 
-// --- 主页 HTML (修复版: 大字体 + 紧凑输入框) ---
+// --- 主页 HTML ---
 function renderHTML(config) {
     const bg = config.bgImage || 'https://other.api.yilx.cc/api/moe';
     const title = config.title || '服务器状态';
@@ -300,82 +316,33 @@ function renderHTML(config) {
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;background:url('${bg}') no-repeat center center fixed;background-size:cover}
 body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:-1}
-.box{background:rgba(255,255,255,0.15);backdrop-filter:blur(30px);padding:45px 35px;border-radius:50px;width:calc(100% - 40px);max-width:460px;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);color:#fff;position:relative;overflow:hidden}
+.box{background:rgba(255,255,255,0.15);backdrop-filter:blur(30px);padding:45px 35px;border-radius:50px;width:calc(100% - 40px);max-width:460px;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);color:#fff;position:relative}
 .set-btn{position:absolute;top:25px;right:25px;width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;z-index:10}
 .logo{width:85px;height:85px;margin-bottom:25px;border-radius:35px;box-shadow:0 12px 24px rgba(0,0,0,0.3)}
 h2{margin:0;font-size:26px;font-weight:800}p.d{color:#ffffffb3;font-size:15px;margin:12px 0 35px}
-
-/* 立体 UI 风格 - 字体20px，紧凑型 */
-.input-wrapper {
-    position: relative;
-    border-radius: 50px; /* 还原为 50px */
-    overflow: hidden;
-    margin-bottom: 18px;
-}
-textarea {
-    width:100%; min-height:50px; /* 稍微调低高度 */
-    padding:14px 25px; /* 调低内边距，让文字更贴近边缘 */
-    border-radius:50px; 
-    font-size:20px; /* 字体加大 */
-    line-height:24px; /* 确保文字不被截断 */
-    background:rgba(0,0,0,0.25); 
-    border:1px solid rgba(255,255,255,0.1); 
-    color:#fff; 
-    scrollbar-width:none; -ms-overflow-style:none;
-    outline: none;
-    box-shadow: inset 0 3px 6px rgba(0,0,0,0.4), inset 0 0 2px rgba(0,0,0,0.6);
-    backdrop-filter: blur(10px);
-    display: block;
-}
+input,textarea,button{font-family:inherit;outline:none;box-sizing:border-box;border-radius:20px}
+textarea{width:100%;min-height:54px;padding:18px 25px;margin-bottom:18px;border-radius:50px;font-size:17px;background:#00000040;border:1px solid #ffffff1a;color:#fff;scrollbar-width:none;-ms-overflow-style:none}
 textarea::-webkit-scrollbar{display:none}
-
-button {
-    background: linear-gradient(145deg, #ffffff, #e6e6e6); 
-    color: #000; border: none; 
-    height: 54px; width: 100%; 
-    border-radius: 50px;
-    font-weight: 700; font-size: 17px; cursor: pointer;
-    /* 凸起立体感 */
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.05);
-    transition: transform 0.1s, box-shadow 0.1s;
-    position: relative;
-    overflow: hidden;
-}
-button:active { 
-    transform: translateY(3px); 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3), inset 0 2px 3px rgba(0,0,0,0.2); 
-}
-
-/* 鼠标跟随光效 CSS */
-.spotlight {
-    position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(120px circle at var(--x) var(--y), rgba(255,255,255,0.15), transparent 40%);
-    opacity: 0; transition: opacity 0.3s;
-}
-.box:hover .spotlight { opacity: 1; }
-
+button{background:#fff;color:#000;border:none;height:54px;border-radius:50px;font-weight:700;width:100%;font-size:17px;cursor:pointer}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#00000099;backdrop-filter:blur(8px);align-items:center;justify-content:center;z-index:100}
 .m-box{background:#1e1e23f2;padding:25px;border-radius:40px;width:90%;max-width:350px;text-align:left;color:#fff;max-height:85vh;overflow-y:auto;border:1px solid #ffffff1a}
 .m-t{font-size:20px;font-weight:bold;margin-bottom:20px;text-align:center}
 .m-l{display:block;font-size:13px;margin:10px 5px 5px;opacity:0.7}
-.m-i{width:100%;padding:12px 15px;margin-bottom:5px;background:#0000004d;border:1px solid #ffffff1a;color:#fff;border-radius:15px}
+.m-i{width:100%;padding:12px 15px;margin-bottom:5px;background:#0000004d;border:1px solid #ffffff1a;color:#fff}
 .tab-box{display:flex;margin-bottom:15px;border-bottom:1px solid #ffffff1a}
 .tab{flex:1;text-align:center;padding:10px;cursor:pointer;opacity:0.6}
 .tab.active{opacity:1;border-bottom:2px solid #fff;font-weight:bold}
 .cmd{display:flex;gap:5px;margin-bottom:8px}
-.del{background:#f44;color:#fff;width:40px;height:auto;font-size:12px;border-radius:10px;border:none}
+.del{background:#f44;color:#fff;width:40px;height:auto;font-size:12px}
 .card-img{width:100%;border-radius:50px;box-shadow:0 20px 40px rgba(0,0,0,0.5)}
 </style>
 </head>
 <body>
-<div class="box" id="card-box">
-    <div class="spotlight"></div>
+<div class="box">
     <div class="set-btn" onclick="openSet()">⚙️</div>
     <img src="https://ib.a0b.de5.net/file/1770001024571_2307052_Mvie09JU.png" class="logo">
     <h2>${title}</h2><p class="d">输入Minecraft服务器地址，一键获取</p>
-    <div class="input-wrapper">
-        <textarea id="ip" placeholder="play.hypixel.net" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'"></textarea>
-    </div>
+    <textarea id="ip" placeholder="play.hypixel.net" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'"></textarea>
     <button onclick="gen()">生成预览卡片</button>
     <div id="res" style="margin-top:40px"></div>
     <div id="full-box" style="margin-top:25px;padding:22px;background:#00000073;border-radius:50px;text-align:left;display:none;font-size:14px;line-height:1.7"><div style="color:#fab387;font-size:12px;font-weight:900;margin-bottom:12px">完整 MOTD</div><div id="full-con" style="white-space:pre-wrap"></div></div>
@@ -400,13 +367,6 @@ button:active {
 
 <script>
 let tg = ${tgConfigSafe};
-// 光效追踪逻辑
-document.getElementById('card-box').addEventListener('mousemove', e => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--x', (e.clientX - rect.left) + 'px');
-    e.currentTarget.style.setProperty('--y', (e.clientY - rect.top) + 'px');
-});
-
 function openSet(){localStorage.getItem('au')?showConf():document.getElementById('loginM').style.display='flex'}
 function closeM(i){document.getElementById(i).style.display='none'}
 function showConf(){
