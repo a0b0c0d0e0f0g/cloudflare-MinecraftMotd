@@ -15,30 +15,23 @@ export default {
     }
     if (url.pathname === '/api/setWebhook' && request.method === 'POST') return handleSetWebhook(request, env);
 
-    // 3. 页面与内容逻辑
+    // 3. 页面与图片逻辑
     const serverIP = url.searchParams.get("server");
-    
-    // 如果没有 IP，返回主页
     if (!serverIP) {
       const config = await getConfig(env);
       return new Response(renderHTML(config), { headers: { "Content-Type": "text/html;charset=UTF-8" } });
     }
-
-    const type = url.searchParams.get("type");
-
-    // 模式 A: API 数据
-    if (type === "info") return handleInfoRequest(serverIP);
     
-    // 模式 B: 截图专用 HTML 卡片 (新增，用于 Telegram 发图)
-    if (type === "card") return handleHtmlCardRequest(serverIP, env);
-
-    // 模式 C: 直接 SVG 图片 (默认)
-    return handleImageRequest(serverIP, env);
+    // 模式区分
+    const type = url.searchParams.get("type");
+    if (type === "info") return handleInfoRequest(serverIP);
+    if (type === "card") return handleHtmlCardRequest(serverIP, env); // 截图专用HTML
+    return handleImageRequest(serverIP, env); // 默认SVG图片
   }
 };
 
 // ==========================================
-//           Telegram 核心逻辑
+//           Telegram 核心逻辑 (修复版)
 // ==========================================
 async function handleTelegramWebhook(request, env) {
     const config = await getConfig(env);
@@ -52,7 +45,7 @@ async function handleTelegramWebhook(request, env) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
             
-            // 自定义回复
+            // 1. 自定义回复
             if (tgConfig.customCommands) {
                 for (const cmdObj of tgConfig.customCommands) {
                     if (text === cmdObj.cmd) {
@@ -62,7 +55,7 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 状态查询
+            // 2. 状态查询 (默认 /motd)
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
@@ -72,42 +65,51 @@ async function handleTelegramWebhook(request, env) {
             }
 
             if (serverIP) {
+                // 获取数据
+                let data;
                 try {
-                    // 先发一个“正在查询”的状态 (可选，如果查询很慢的话)
-                    // await sendTelegramMessage(token, chatId, "🔍 ...", null);
+                    data = await fetchMinecraftStatus(serverIP);
+                } catch (e) {
+                    await sendTelegramMessage(token, chatId, `❌ API 请求失败: ${e.message}`, null);
+                    return new Response("OK");
+                }
 
-                    const data = await fetchMinecraftStatus(serverIP);
-                    const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+                const esc = (str) => (str || "Unknown").toString().replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 
-                    if (!data.online) {
-                        await sendTelegramMessage(token, chatId, `🔴 *${esc(serverIP)}* 离线`, "MarkdownV2");
-                    } else {
-                        const workerUrl = new URL(request.url).origin;
-                        
-                        // 修改：使用 type=card 获取纯 HTML 页面进行截图，比截 SVG 稳定得多
-                        const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
-                        
-                        // 使用 mshots 截图，宽度 460
-                        const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
-                        
-                        const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-                        const caption = `🟢 *${esc(serverIP)}* 在线\n` +
+                if (!data.online) {
+                    await sendTelegramMessage(token, chatId, `🔴 *${esc(serverIP)}* 离线`, "MarkdownV2");
+                } else {
+                    // 准备文本内容
+                    const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+                    const textCaption = `🟢 *${esc(serverIP)}* 在线\n` +
                                         `👥 人数: \`${esc(data.players.online)}/${esc(data.players.max)}\`\n` +
                                         `ℹ️ 版本: ${esc(data.version.name_clean)}\n` +
                                         `📝 MOTD: ${cleanMotd}`;
+
+                    // 尝试发送图片
+                    try {
+                        const workerUrl = new URL(request.url).origin;
+                        // 使用 type=card 获取纯净HTML供截图
+                        const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
+                        // mshots 截图服务，宽 460
+                        const screenshotUrl = `https://s0.wp.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460&t=${Date.now()}`;
                         
-                        await sendTelegramPhoto(token, chatId, screenshotUrl, caption);
+                        await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
+                    } catch (imgError) {
+                        // 【关键修复】如果发图失败（超时/报错），降级发送文本消息
+                        console.error("发图失败，转文本:", imgError);
+                        const errorMsg = `⚠️ _图片生成失败 (${imgError.message})，仅显示文字:_\n\n${textCaption}`;
+                        await sendTelegramMessage(token, chatId, errorMsg, "MarkdownV2");
                     }
-                } catch (err) {
-                    await sendTelegramMessage(token, chatId, `❌ 查询出错: ${err.message}`, null);
                 }
             }
         }
         return new Response("OK");
-    } catch (e) { return new Response("Error", { status: 200 }); }
+    } catch (e) {
+        return new Response("Error", { status: 200 });
+    }
 }
 
-// --- 消息发送工具 ---
 async function sendTelegramMessage(token, chatId, text, parseMode) {
     const payload = { chat_id: chatId, text: text };
     if (parseMode) payload.parse_mode = parseMode;
@@ -120,19 +122,15 @@ async function sendTelegramMessage(token, chatId, text, parseMode) {
 async function sendTelegramPhoto(token, chatId, photo, caption) {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            chat_id: chatId, photo: photo, caption: caption, parse_mode: 'MarkdownV2' 
-        })
+        body: JSON.stringify({ chat_id: chatId, photo: photo, caption: caption, parse_mode: 'MarkdownV2' })
     });
-    // 错误处理：如果发图失败，尝试发文本报错，方便调试
     const d = await res.json();
-    if (!d.ok) throw new Error("发图失败: " + d.description);
+    if (!d.ok) throw new Error(d.description || "TG API Error");
 }
 
 // ==========================================
 //           核心逻辑：生成 SVG 字符串
 // ==========================================
-// 提取这个函数以便 handleImageRequest 和 handleHtmlCardRequest 复用
 async function generateSvgString(serverIP, env) {
     const conf = await getConfig(env);
     const bg = conf.bgImage || `https://other.api.yilx.cc/api/moe?t=${Date.now()}`;
@@ -147,13 +145,12 @@ async function generateSvgString(serverIP, env) {
     const players = (isOnline && d.players.list) ? d.players.list : [];
     const pListHtml = players.length > 0 ? players.map(p=>`<div style="height:20px;color:#fff">${p.name_html||p.name_clean}</div>`).join("") : '<div style="color:#fff;opacity:0.5">No players online</div>';
     
-    // 布局常量
     const cardWidth = 460;
     const contentW = 390; 
     const statusX = 320;
     const statusTextX = 372.5;
     const h = 320 + Math.max((players.length||1)*22, 30);
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -180,7 +177,7 @@ async function generateSvgString(serverIP, env) {
     </svg>`;
 }
 
-// 模式 C: 直接返回图片 (浏览器直接访问用)
+// 模式 C: 直接返回图片
 async function handleImageRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
@@ -188,12 +185,12 @@ async function handleImageRequest(ip, env) {
     } catch(e) { return new Response("Error", {status:500}); }
 }
 
-// 模式 B: 返回包含图片的 HTML 页面 (截图工具用)
+// 模式 B: 返回纯 HTML 卡片 (供截图用)
 async function handleHtmlCardRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
-        // 生成一个紧凑的 HTML 页面，只有 SVG，没有边距，确保截图精确
-        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden"><body style="margin:0;padding:0;overflow:hidden">${svg}</body></html>`;
+        // 添加 viewport 标签优化截图渲染
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden">${svg}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
