@@ -30,7 +30,7 @@ export default {
 };
 
 // ==========================================
-//           Telegram 核心逻辑
+//           Telegram 核心逻辑 (修复版)
 // ==========================================
 async function handleTelegramWebhook(request, env) {
     const config = await getConfig(env);
@@ -54,7 +54,7 @@ async function handleTelegramWebhook(request, env) {
                 }
             }
 
-            // 2. 状态查询
+            // 2. 状态查询 (默认 /motd)
             const statusCmd = tgConfig.statusCmd || "/motd";
             let serverIP = "";
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
@@ -79,21 +79,31 @@ async function handleTelegramWebhook(request, env) {
                     await sendTelegramMessage(token, chatId, `🔴 *${esc(serverIP)}* 离线`, "MarkdownV2");
                 } else {
                     const cleanMotd = (data.motd.clean || "").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+                    
+                    // --- 新增：处理玩家列表文字版 ---
+                    let playerNamesStr = "无";
+                    if (data.players.list && data.players.list.length > 0) {
+                        // 提取名字并转义，然后用逗号连接
+                        playerNamesStr = data.players.list.map(p => esc(p.name_clean)).join(", ");
+                    }
+                    // ---------------------------
+
                     const textCaption = `🟢 *${esc(serverIP)}* 在线\n` +
                                         `👥 人数: \`${esc(data.players.online)}/${esc(data.players.max)}\`\n` +
                                         `ℹ️ 版本: ${esc(data.version.name_clean)}\n` +
+                                        `📃 玩家: ${playerNamesStr}\n` + // 添加到文本中
                                         `📝 MOTD:\n${cleanMotd}`;
 
                     try {
                         const workerUrl = new URL(request.url).origin;
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
-                        
-                        // 使用 Microlink 截图
+                        // 使用 Microlink 截图 (支持透明背景)
                         const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=600&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
                         const errStr = (imgError.message || "Unknown").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+                        // 确保这里发送的是包含玩家列表的完整文本
                         const errorMsg = `⚠️ _发图失败 \\(${errStr}\\)，显示文本:_\n\n${textCaption}`;
                         await sendTelegramMessage(token, chatId, errorMsg, "MarkdownV2");
                     }
@@ -139,7 +149,7 @@ async function generateSvgString(serverIP, env) {
     const isOnline = d.online;
     const motd = isOnline ? (d.motd?.html || "<div>A Minecraft Server</div>") : "<div>Server Offline</div>";
     
-    // 修复点：完整的玩家列表生成逻辑
+    // 玩家列表逻辑
     const players = (isOnline && d.players.list) ? d.players.list : [];
     const pListHtml = players.length > 0 
         ? players.map(p => `<div style="height:20px;color:#fff">${p.name_html || p.name_clean}</div>`).join("") 
@@ -150,7 +160,7 @@ async function generateSvgString(serverIP, env) {
     const statusX = 320;
     const statusTextX = 372.5;
     const h = 320 + Math.max((players.length||1)*22, 30);
-    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
+    const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
     return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -186,10 +196,11 @@ async function handleImageRequest(ip, env) {
 }
 
 // 模式 B: 返回纯 HTML 卡片 (供截图用)
+// 【修复点】显式设置背景为透明，解决截图白底问题
 async function handleHtmlCardRequest(ip, env) {
     try {
         const svg = await generateSvgString(ip, env);
-        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden">${svg}</body></html>`;
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent">${svg}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
