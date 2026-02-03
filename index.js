@@ -124,23 +124,20 @@ const htmlTemplate = `
             background: rgba(255, 255, 255, 0.15); 
             backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
             padding: 45px 35px; 
-            border-radius: 50px; /* iPhone 连续曲率风格 (保持不变) */
-            width: calc(100% - 40px); /* 保持之前的手机端空隙修改 */
-            max-width: 460px; text-align: center; 
+            border-radius: 50px; /* iPhone 连续曲率风格 */
+            width: 85%; max-width: 460px; text-align: center; 
             box-shadow: 0 25px 50px rgba(0,0,0,0.4);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
         }
         
-        /* 修改：增大圆角至 26px */
-        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 26px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
+        .logo { width: 85px; height: 85px; margin-bottom: 25px; border-radius: 20px; box-shadow: 0 12px 24px rgba(0,0,0,0.3); }
         h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
         p.desc { color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 12px 0 35px; }
         
         textarea { 
             width: 100%; min-height: 54px; padding: 18px; margin-bottom: 18px; 
-            /* 修改：增大圆角至 26px */
-            border-radius: 26px; border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); 
             background: rgba(0, 0, 0, 0.25); color: white; 
             box-sizing: border-box; font-size: 17px; font-family: inherit;
             outline: none; resize: none; overflow: hidden; display: block;
@@ -150,8 +147,7 @@ const htmlTemplate = `
         
         button { 
             background: white; color: #000; border: none; height: 54px; 
-            /* 修改：增大圆角至 26px */
-            border-radius: 26px; font-weight: 700; cursor: pointer; 
+            border-radius: 20px; font-weight: 700; cursor: pointer; 
             width: 100%; font-size: 17px; transition: all 0.4s cubic-bezier(0.15, 0, 0.2, 1);
         }
         button:hover { background: #eee; transform: scale(1.02); }
@@ -160,8 +156,8 @@ const htmlTemplate = `
         #res { margin-top: 40px; width: 100%; }
         #full-motd-box { 
             margin-top: 25px; padding: 22px; background: rgba(0,0,0,0.45); 
-            /* 修改：增大圆角至 32px */
-            border-radius: 32px; text-align: left; display: none; 
+            border-radius: 50px; /* 修改：将圆角从 28px 改为 50px 以统一风格 */
+            text-align: left; display: none; 
             border: 1px solid rgba(255,255,255,0.08);
         }
         .motd-title { color: #fab387; font-size: 12px; font-weight: 900; margin-bottom: 12px; opacity: 0.9; text-transform: uppercase; }
