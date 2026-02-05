@@ -95,7 +95,6 @@ async function handleTelegramWebhook(request, env) {
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
                         const { height } = computeCardMetrics(serverIP, data);
                         const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
-                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&fullPage=true&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
@@ -236,8 +235,6 @@ async function handleHtmlCardRequest(ip, env, request) {
     try {
         const { svg, height } = await generateSvgString(ip, env);
         const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460,height=${height}"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px">${svg}</body></html>`;
-        const svg = await generateSvgString(ip, env);
-        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;display:inline-block;line-height:0">${svg}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
@@ -358,8 +355,8 @@ p.d{color:var(--text-soft);font-size:15px;margin:12px 0 34px}
     transition: box-shadow 0.2s ease;
 }
 textarea {
-    width:100%; min-height:50px; 
-    padding:14px 25px; 
+    width:100%; min-height:54px; height:54px;
+    padding:14px 25px;
     border-radius:50px; 
     font-size:20px; /* 大字体 */
     line-height:24px;
@@ -371,6 +368,7 @@ textarea {
     box-shadow: inset 0 3px 10px rgba(0,0,0,0.35), inset 0 0 2px rgba(0,0,0,0.6);
     backdrop-filter: blur(12px);
     display: block;
+    box-sizing: border-box;
     transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 textarea::-webkit-scrollbar{display:none}
@@ -400,6 +398,17 @@ button:active {
     box-shadow: 0 2px 5px rgba(0,0,0,0.3), inset 0 2px 3px rgba(0,0,0,0.2); 
 }
 button:hover{box-shadow:0 12px 22px rgba(0,0,0,0.35)}
+.preview-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.sub-btn{
+    flex:1 1 45%;
+    height:42px;
+    border-radius:30px;
+    font-size:14px;
+    background:rgba(255,255,255,0.16);
+    color:#fff;
+    box-shadow:0 8px 16px rgba(0,0,0,0.22);
+}
+.sub-btn:hover{box-shadow:0 10px 18px rgba(0,0,0,0.3)}
 
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);align-items:center;justify-content:center;z-index:100}
 .m-box{background:rgba(22,25,35,0.92);padding:26px;border-radius:32px;width:90%;max-width:360px;text-align:left;color:#fff;max-height:85vh;overflow-y:auto;border:1px solid rgba(255,255,255,0.12);box-shadow:0 18px 30px rgba(0,0,0,0.45)}
@@ -423,6 +432,12 @@ button:hover{box-shadow:0 12px 22px rgba(0,0,0,0.35)}
         <textarea id="ip" placeholder="play.hypixel.net" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'"></textarea>
     </div>
     <button onclick="gen()">生成预览卡片</button>
+    <div class="preview-actions">
+        <button class="sub-btn" onclick="openCard('image')">打开图片</button>
+        <button class="sub-btn" onclick="openCard('card')">打开卡片页</button>
+        <button class="sub-btn" onclick="copyLink('image')">复制图片链接</button>
+        <button class="sub-btn" onclick="copyLink('markdown')">复制 Markdown</button>
+    </div>
     <div id="res" style="margin-top:40px"></div>
     <div id="full-box" style="margin-top:25px;padding:22px;background:#00000073;border-radius:50px;text-align:left;display:none;font-size:14px;line-height:1.7"><div style="color:#fab387;font-size:12px;font-weight:900;margin-bottom:12px">完整 MOTD</div><div id="full-con" style="white-space:pre-wrap"></div></div>
     <div style="margin-top:35px;font-size:13px;opacity:0.4">© 2026 MC Status Card</div>
@@ -468,6 +483,41 @@ function renderC(){
     });
 }
 function addC(){ if(!tg.customCommands)tg.customCommands=[]; tg.customCommands.push({cmd:'',reply:''}); renderC(); }
+function getServerIp(){
+    return document.getElementById('ip').value.trim();
+}
+function getCardUrl(type){
+    const ip = getServerIp();
+    if(!ip) return '';
+    const base = location.origin + '?server=' + encodeURIComponent(ip);
+    if(type === 'card') return location.origin + '?type=card&server=' + encodeURIComponent(ip);
+    return base;
+}
+function openCard(type){
+    const url = getCardUrl(type);
+    if(!url) return alert('请输入服务器地址');
+    window.open(url, '_blank');
+}
+async function copyLink(type){
+    const ip = getServerIp();
+    if(!ip) return alert('请输入服务器地址');
+    const imageUrl = getCardUrl('image');
+    const text = type === 'markdown'
+        ? `![Minecraft 状态](${imageUrl})`
+        : imageUrl;
+    try{
+        await navigator.clipboard.writeText(text);
+        alert('已复制');
+    } catch(e){
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        alert('已复制');
+    }
+}
 async function login(){
     const u=document.getElementById('u').value, p=document.getElementById('p').value;
     const r=await fetch('/api/login',{method:'POST',body:JSON.stringify({username:u,password:p})});
@@ -482,7 +532,7 @@ async function hook(){
     const d=await r.json(); alert(d.ok?'绑定成功':'失败: '+d.description);
 }
 async function gen(){
-    const ip=document.getElementById('ip').value;if(!ip)return;
+    const ip=getServerIp();if(!ip)return;
     const r=document.getElementById('res');r.innerHTML='Loading...';
     const i=new Image();i.className='card-img';i.src=location.origin+'?server='+encodeURIComponent(ip);
     i.onload=()=>{r.innerHTML='';r.appendChild(i)};
