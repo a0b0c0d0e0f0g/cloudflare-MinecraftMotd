@@ -24,7 +24,7 @@ export default {
     
     const type = url.searchParams.get("type");
     if (type === "info") return handleInfoRequest(serverIP);
-    if (type === "card") return handleHtmlCardRequest(serverIP, env); 
+    if (type === "card") return handleHtmlCardRequest(serverIP, env, request); 
     return handleImageRequest(serverIP, env); 
   }
 };
@@ -231,7 +231,7 @@ async function handleImageRequest(ip, env) {
 }
 
 // 模式 B: 返回纯 HTML 卡片
-async function handleHtmlCardRequest(ip, env) {
+async function handleHtmlCardRequest(ip, env, request) {
     try {
         const { svg, height } = await generateSvgString(ip, env);
         const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460,height=${height}"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px">${svg}</body></html>`;
