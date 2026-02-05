@@ -95,6 +95,7 @@ async function handleTelegramWebhook(request, env) {
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
                         const { height } = computeCardMetrics(serverIP, data);
                         const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
+                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&fullPage=true&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
@@ -234,13 +235,9 @@ async function handleImageRequest(ip, env) {
 async function handleHtmlCardRequest(ip, env, request) {
     try {
         const { svg, height } = await generateSvgString(ip, env);
-        // 仅在 ?debug=1 时注入调试脚本，输出“计算高度 vs 实际渲染高度”
-        const debug = request && new URL(request.url).searchParams.get("debug") === "1";
-        const debugScript = debug
-            ? `<script>const s=document.querySelector('svg');const r=s.getBoundingClientRect();console.log('[card-height] computed=${height}px actual='+r.height+'px');</script>`
-            : "";
-        // 强制 HTML/body 高度与 SVG 高度一致，避免截图工具添加额外空白。
-        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px"><head><meta name="viewport" content="width=460,height=${height}"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px;line-height:0"><div style="width:460px;height:${height}px">${svg}</div>${debugScript}</body></html>`;
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460,height=${height}"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px">${svg}</body></html>`;
+        const svg = await generateSvgString(ip, env);
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;display:inline-block;line-height:0">${svg}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
@@ -292,7 +289,6 @@ async function handleAuthLogin(req, env) {
 }
 
 function computeCardMetrics(serverIP, data) {
-    // 与 SVG 中的布局计算保持一致，用于截图高度估算。
     const players = data.players || { online: 0, max: 0, list: [] };
     const paddingLeft = 115;
     const rightAnchor = 425;
@@ -316,7 +312,6 @@ function computeCardMetrics(serverIP, data) {
 }
 
 function computeCardMetricsFromLayout(statsY, ipY, playerCount) {
-    // 统一 header / 玩家区域 / footer 的高度规则，避免 HTML 与 SVG 计算不一致。
     const headerHeight = Math.max(statsY + 10, ipY + 10, 115);
     const playerAreaHeight = Math.max((playerCount || 1) * 22, 30);
     const height = headerHeight + 85 + 35 + playerAreaHeight + 45;
