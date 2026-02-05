@@ -24,7 +24,7 @@ export default {
     
     const type = url.searchParams.get("type");
     if (type === "info") return handleInfoRequest(serverIP);
-    if (type === "card") return handleHtmlCardRequest(serverIP, env); 
+    if (type === "card") return handleHtmlCardRequest(serverIP, env, request); 
     return handleImageRequest(serverIP, env); 
   }
 };
@@ -90,9 +90,11 @@ async function handleTelegramWebhook(request, env) {
                                         `📝 MOTD:\n${cleanMotd}`;
 
                     try {
+                        // Microlink 截图高度来自计算出的卡片布局高度，确保图片与 SVG 一致，减少空白。
                         const workerUrl = new URL(request.url).origin;
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
-                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=600&viewport.deviceScaleFactor=2&t=${Date.now()}`;
+                        const { height } = computeCardMetrics(serverIP, data);
+                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
@@ -188,13 +190,11 @@ async function generateSvgString(serverIP, env) {
         ipY += 25; 
     });
 
-    const headerHeight = Math.max(statsY + 10, ipY + 10, 115);
-    const playerAreaHeight = Math.max((players.length||1)*22, 30);
-    const h = headerHeight + 85 + 35 + playerAreaHeight + 45;
+    const { headerHeight, playerAreaHeight, height: h } = computeCardMetricsFromLayout(statsY, ipY, players.length);
 
     const icon = (isOnline && d.icon) ? d.icon : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAHdElNRQfmBQIIDisOf7SDAAAB60lEQVRYw+2Wv07DMBTGv7SjCBMTE88D8SAsIAlLpC68SAsv0sqD8EDMPEAkEpS6IDEx8R7IDCSmIDExMTERExO76R0SInX6p07qXpInR7Gv78/n77OfL6Ioiv49pA4UUB8KoD4UQH0ogPpQAPWhAOpDAdSHAqgPBVAfCqA+FEAtpA4877LpOfu+8e67HrvuGfd9j73pOfuB9+7XvjvXv9+8f/35vvuO9963vveee993rN+8937YvPue995733fvvfd9933P+8593/vOu997773vvu+59773vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+9733vve+973v";
 
-    return `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
+    const svg = `<svg width="${cardWidth}" height="${h}" viewBox="0 0 ${cardWidth} ${h}" xmlns="http://www.w3.org/2000/svg">
         <defs>
             <style>
                 .sh{text-shadow:1px 1px 2px rgba(0,0,0,0.8)}
@@ -219,21 +219,28 @@ async function generateSvgString(serverIP, env) {
         <text x="${cardWidth-35}" y="${h-60}" text-anchor="end" font-family="Arial" font-size="10" fill="#ffffffaa" class="sh">motd.a0b.de5.net</text>
         <text x="${cardWidth-35}" y="${h-45}" text-anchor="end" font-family="Arial" font-size="11" fill="#ffffffaa" class="sh">${time}</text>
     </svg>`;
+    return { svg, height: h };
 }
 
 // 模式 C: 直接返回图片
 async function handleImageRequest(ip, env) {
     try {
-        const svg = await generateSvgString(ip, env);
+        const { svg } = await generateSvgString(ip, env);
         return new Response(svg, {headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-cache'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
 
 // 模式 B: 返回纯 HTML 卡片
-async function handleHtmlCardRequest(ip, env) {
+async function handleHtmlCardRequest(ip, env, request) {
     try {
-        const svg = await generateSvgString(ip, env);
-        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent">${svg}</body></html>`;
+        const { svg, height } = await generateSvgString(ip, env);
+        // 仅在 ?debug=1 时注入调试脚本，输出“计算高度 vs 实际渲染高度”
+        const debug = request && new URL(request.url).searchParams.get("debug") === "1";
+        const debugScript = debug
+            ? `<script>const s=document.querySelector('svg');const r=s.getBoundingClientRect();console.log('[card-height] computed=${height}px actual='+r.height+'px');</script>`
+            : "";
+        // 强制 HTML/body 高度与 SVG 高度一致，避免截图工具添加额外空白。
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px"><head><meta name="viewport" content="width=460,height=${height}"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px;line-height:0"><div style="width:460px;height:${height}px">${svg}</div>${debugScript}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
@@ -282,6 +289,38 @@ async function handleAuthLogin(req, env) {
     const body = await req.json();
     if(await checkAuth(env, body)) return new Response('{"success":true}', {headers:{'Content-Type':'application/json'}});
     return new Response('{"success":false}', {status:401});
+}
+
+function computeCardMetrics(serverIP, data) {
+    // 与 SVG 中的布局计算保持一致，用于截图高度估算。
+    const players = data.players || { online: 0, max: 0, list: [] };
+    const paddingLeft = 115;
+    const rightAnchor = 425;
+
+    const statusText = data.online ? `${players.online}/${players.max}` : "OFFLINE";
+    const badgeWidth = Math.max(70, statusText.length * 9 + 24);
+    const badgeX = rightAnchor - badgeWidth;
+    const maxIpWidthPixels = badgeX - paddingLeft - 10;
+    const maxIpChar = Math.floor(maxIpWidthPixels / 11);
+    const ipLineCount = serverIP.length > maxIpChar && maxIpChar > 5 ? 2 : 1;
+
+    let statsY = 48;
+    statsY += 24;
+    statsY += 18;
+
+    let ipY = 60;
+    ipY += ipLineCount * 25;
+
+    const { height } = computeCardMetricsFromLayout(statsY, ipY, players.list.length);
+    return { height };
+}
+
+function computeCardMetricsFromLayout(statsY, ipY, playerCount) {
+    // 统一 header / 玩家区域 / footer 的高度规则，避免 HTML 与 SVG 计算不一致。
+    const headerHeight = Math.max(statsY + 10, ipY + 10, 115);
+    const playerAreaHeight = Math.max((playerCount || 1) * 22, 30);
+    const height = headerHeight + 85 + 35 + playerAreaHeight + 45;
+    return { headerHeight, playerAreaHeight, height };
 }
 
 // --- 主页 HTML (大字体 + 紧凑输入框) ---
