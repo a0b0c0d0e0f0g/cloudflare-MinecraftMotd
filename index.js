@@ -94,6 +94,7 @@ async function handleTelegramWebhook(request, env) {
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
                         const { height } = computeCardMetrics(serverIP, data);
                         const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
+                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&fullPage=true&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
@@ -234,6 +235,8 @@ async function handleHtmlCardRequest(ip, env) {
     try {
         const { svg, height } = await generateSvgString(ip, env);
         const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460,height=${height}"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;width:460px;height:${height}px">${svg}</body></html>`;
+        const svg = await generateSvgString(ip, env);
+        const html = `<!DOCTYPE html><html style="margin:0;padding:0;overflow:hidden;background:transparent"><head><meta name="viewport" content="width=460"></head><body style="margin:0;padding:0;overflow:hidden;background:transparent;display:inline-block;line-height:0">${svg}</body></html>`;
         return new Response(html, {headers:{'Content-Type':'text/html;charset=UTF-8'}});
     } catch(e) { return new Response("Error", {status:500}); }
 }
