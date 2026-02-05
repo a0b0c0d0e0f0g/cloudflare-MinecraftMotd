@@ -90,6 +90,7 @@ async function handleTelegramWebhook(request, env) {
                                         `📝 MOTD:\n${cleanMotd}`;
 
                     try {
+                        // Microlink 截图高度来自计算出的卡片布局高度，确保图片与 SVG 一致，减少空白。
                         const workerUrl = new URL(request.url).origin;
                         const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
                         const { height } = computeCardMetrics(serverIP, data);
@@ -329,12 +330,23 @@ function renderHTML(config) {
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
 <style>
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;background:url('${bg}') no-repeat center center fixed;background-size:cover}
-body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:-1}
-.box{background:rgba(255,255,255,0.15);backdrop-filter:blur(30px);padding:45px 35px;border-radius:50px;width:calc(100% - 40px);max-width:460px;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);color:#fff;position:relative;overflow:hidden}
-.set-btn{position:absolute;top:25px;right:25px;width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;z-index:10}
-.logo{width:85px;height:85px;margin-bottom:25px;border-radius:35px;box-shadow:0 12px 24px rgba(0,0,0,0.3)}
-h2{margin:0;font-size:26px;font-weight:800}p.d{color:#ffffffb3;font-size:15px;margin:12px 0 35px}
+:root{
+    --glass: rgba(255,255,255,0.14);
+    --glass-strong: rgba(255,255,255,0.22);
+    --glass-border: rgba(255,255,255,0.2);
+    --text-soft: rgba(255,255,255,0.75);
+    --accent: #8bd3ff;
+    --accent-strong: #4da8ff;
+    --shadow-strong: 0 28px 60px rgba(0,0,0,0.45);
+}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;background:url('${bg}') no-repeat center center fixed;background-size:cover;color:#fff}
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg, rgba(12,16,24,0.65), rgba(12,16,24,0.3));z-index:-1}
+.box{background:var(--glass);backdrop-filter:blur(32px);padding:46px 36px;border-radius:46px;width:calc(100% - 40px);max-width:460px;text-align:center;box-shadow:var(--shadow-strong);border:1px solid var(--glass-border);color:#fff;position:relative;overflow:hidden}
+.set-btn{position:absolute;top:22px;right:22px;width:38px;height:38px;background:var(--glass-strong);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;z-index:10;box-shadow:0 8px 16px rgba(0,0,0,0.25);transition:transform 0.12s ease, background 0.2s ease}
+.set-btn:hover{transform:translateY(-1px);background:rgba(255,255,255,0.32)}
+.logo{width:86px;height:86px;margin-bottom:24px;border-radius:30px;box-shadow:0 16px 32px rgba(0,0,0,0.35)}
+h2{margin:0;font-size:28px;font-weight:800;letter-spacing:0.5px}
+p.d{color:var(--text-soft);font-size:15px;margin:12px 0 34px}
 
 /* 立体 UI 风格 - 字体20px，紧凑型 */
 .input-wrapper {
@@ -342,6 +354,8 @@ h2{margin:0;font-size:26px;font-weight:800}p.d{color:#ffffffb3;font-size:15px;ma
     border-radius: 50px; 
     overflow: hidden;
     margin-bottom: 18px;
+    box-shadow: 0 10px 24px rgba(10,18,30,0.35);
+    transition: box-shadow 0.2s ease;
 }
 textarea {
     width:100%; min-height:50px; 
@@ -349,25 +363,35 @@ textarea {
     border-radius:50px; 
     font-size:20px; /* 大字体 */
     line-height:24px;
-    background:rgba(0,0,0,0.25); 
-    border:1px solid rgba(255,255,255,0.1); 
+    background:rgba(0,0,0,0.28); 
+    border:1px solid rgba(255,255,255,0.15); 
     color:#fff; 
     scrollbar-width:none; -ms-overflow-style:none;
     outline: none;
-    box-shadow: inset 0 3px 6px rgba(0,0,0,0.4), inset 0 0 2px rgba(0,0,0,0.6);
-    backdrop-filter: blur(10px);
+    box-shadow: inset 0 3px 10px rgba(0,0,0,0.35), inset 0 0 2px rgba(0,0,0,0.6);
+    backdrop-filter: blur(12px);
     display: block;
+    transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 textarea::-webkit-scrollbar{display:none}
+textarea::placeholder{color:rgba(255,255,255,0.55)}
+textarea:focus{
+    border:1px solid rgba(139,211,255,0.6);
+    box-shadow: 0 0 0 3px rgba(139,211,255,0.2), inset 0 3px 10px rgba(0,0,0,0.3);
+    background:rgba(9,20,34,0.45);
+}
+.input-wrapper:focus-within{
+    box-shadow: 0 12px 28px rgba(10,18,30,0.45);
+}
 
 button {
-    background: linear-gradient(145deg, #ffffff, #e6e6e6); 
-    color: #000; border: none; 
+    background: linear-gradient(145deg, #ffffff, #e9f4ff); 
+    color: #0b1a2a; border: none; 
     height: 54px; width: 100%; 
     border-radius: 50px;
     font-weight: 700; font-size: 17px; cursor: pointer;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.05);
-    transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 0 10px 18px rgba(0,0,0,0.32), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.08);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
     position: relative;
     overflow: hidden;
 }
@@ -375,31 +399,23 @@ button:active {
     transform: translateY(3px); 
     box-shadow: 0 2px 5px rgba(0,0,0,0.3), inset 0 2px 3px rgba(0,0,0,0.2); 
 }
+button:hover{box-shadow:0 12px 22px rgba(0,0,0,0.35)}
 
-/* 鼠标跟随光效 CSS */
-.spotlight {
-    position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(120px circle at var(--x) var(--y), rgba(255,255,255,0.15), transparent 40%);
-    opacity: 0; transition: opacity 0.3s;
-}
-.box:hover .spotlight { opacity: 1; }
-
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#00000099;backdrop-filter:blur(8px);align-items:center;justify-content:center;z-index:100}
-.m-box{background:#1e1e23f2;padding:25px;border-radius:40px;width:90%;max-width:350px;text-align:left;color:#fff;max-height:85vh;overflow-y:auto;border:1px solid #ffffff1a}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);align-items:center;justify-content:center;z-index:100}
+.m-box{background:rgba(22,25,35,0.92);padding:26px;border-radius:32px;width:90%;max-width:360px;text-align:left;color:#fff;max-height:85vh;overflow-y:auto;border:1px solid rgba(255,255,255,0.12);box-shadow:0 18px 30px rgba(0,0,0,0.45)}
 .m-t{font-size:20px;font-weight:bold;margin-bottom:20px;text-align:center}
-.m-l{display:block;font-size:13px;margin:10px 5px 5px;opacity:0.7}
-.m-i{width:100%;padding:12px 15px;margin-bottom:5px;background:#0000004d;border:1px solid #ffffff1a;color:#fff;border-radius:15px}
+.m-l{display:block;font-size:13px;margin:10px 5px 5px;opacity:0.75}
+.m-i{width:100%;padding:12px 15px;margin-bottom:5px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:14px}
 .tab-box{display:flex;margin-bottom:15px;border-bottom:1px solid #ffffff1a}
 .tab{flex:1;text-align:center;padding:10px;cursor:pointer;opacity:0.6}
-.tab.active{opacity:1;border-bottom:2px solid #fff;font-weight:bold}
+.tab.active{opacity:1;border-bottom:2px solid var(--accent);font-weight:bold;color:var(--accent)}
 .cmd{display:flex;gap:5px;margin-bottom:8px}
-.del{background:#f44;color:#fff;width:40px;height:auto;font-size:12px;border-radius:10px;border:none}
-.card-img{width:100%;border-radius:50px;box-shadow:0 20px 40px rgba(0,0,0,0.5)}
+.del{background:linear-gradient(135deg, #ff6b6b, #ff3b6b);color:#fff;width:40px;height:auto;font-size:12px;border-radius:10px;border:none}
+.card-img{width:100%;border-radius:40px;box-shadow:0 22px 40px rgba(0,0,0,0.55)}
 </style>
 </head>
 <body>
 <div class="box" id="card-box">
-    <div class="spotlight"></div>
     <div class="set-btn" onclick="openSet()">⚙️</div>
     <img src="https://ib.a0b.de5.net/file/1770001024571_2307052_Mvie09JU.png" class="logo">
     <h2>${title}</h2><p class="d">输入Minecraft服务器地址，一键获取</p>
@@ -415,7 +431,7 @@ button:active {
 <div id="loginM" class="modal"><div class="m-box" style="text-align:center">
     <div class="m-t">管理员登录</div>
     <input id="u" class="m-i" placeholder="账号"><input id="p" type="password" class="m-i" placeholder="密码">
-    <button onclick="login()" style="margin-top:15px;height:45px">登录</button>
+    <button onclick="login()" style="margin-top:15px;height:45px;background:linear-gradient(145deg, #8bd3ff, #4da8ff);color:#052034">登录</button>
     <div style="margin-top:15px;font-size:13px;color:#aaa;cursor:pointer" onclick="closeM('loginM')">取消</div>
 </div></div>
 
@@ -423,19 +439,13 @@ button:active {
     <div class="m-t">设置</div>
     <div class="tab-box"><div class="tab active" onclick="sw(1)">基本</div><div class="tab" onclick="sw(2)">Telegram</div></div>
     <div id="t1"><label class="m-l">网页标题</label><input id="c-ti" class="m-i" value="${title}"><label class="m-l">背景图片 URL</label><input id="c-bg" class="m-i" value="${bg}"></div>
-    <div id="t2" style="display:none"><label class="m-l">Bot Token</label><input id="tg-tk" class="m-i" type="password"><label class="m-l">查询指令 (/m)</label><input id="tg-cmd" class="m-i"><label class="m-l">自定义回复</label><div id="clist"></div><button onclick="addC()" style="background:#ffffff33;color:#fff;height:35px;font-size:14px;margin-top:5px">+ 添加</button><button onclick="hook()" style="background:#50a2ff;color:#fff;margin-top:20px;height:45px">🔗 绑定 Webhook</button></div>
-    <button onclick="save()" style="margin-top:20px;height:45px">保存</button>
+    <div id="t2" style="display:none"><label class="m-l">Bot Token</label><input id="tg-tk" class="m-i" type="password"><label class="m-l">查询指令 (/m)</label><input id="tg-cmd" class="m-i"><label class="m-l">自定义回复</label><div id="clist"></div><button onclick="addC()" style="background:rgba(255,255,255,0.2);color:#fff;height:35px;font-size:14px;margin-top:5px">+ 添加</button><button onclick="hook()" style="background:linear-gradient(145deg, #8bd3ff, #4da8ff);color:#052034;margin-top:20px;height:45px">🔗 绑定 Webhook</button></div>
+    <button onclick="save()" style="margin-top:20px;height:45px;background:linear-gradient(145deg, #ffffff, #dff0ff);color:#0b1a2a">保存</button>
     <div style="margin-top:15px;text-align:center;font-size:13px;color:#aaa;cursor:pointer" onclick="closeM('confM')">关闭</div>
 </div></div>
 
 <script>
 let tg = ${tgConfigSafe};
-// 光效追踪逻辑
-document.getElementById('card-box').addEventListener('mousemove', e => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--x', (e.clientX - rect.left) + 'px');
-    e.currentTarget.style.setProperty('--y', (e.clientY - rect.top) + 'px');
-});
 
 function openSet(){localStorage.getItem('au')?showConf():document.getElementById('loginM').style.display='flex'}
 function closeM(i){document.getElementById(i).style.display='none'}
