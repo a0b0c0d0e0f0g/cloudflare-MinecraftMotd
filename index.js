@@ -503,7 +503,7 @@ async function copyLink(type){
     if(!ip) return alert('请输入服务器地址');
     const imageUrl = getCardUrl('image');
     const text = type === 'markdown'
-        ? `![Minecraft 状态](${imageUrl})`
+        ? '![Minecraft 状态](' + imageUrl + ')'
         : imageUrl;
     try{
         await navigator.clipboard.writeText(text);
