@@ -256,8 +256,25 @@ async function fetchMinecraftStatus(ip) {
     const res = await fetch(`https://api.mcstatus.io/v2/status/java/${encodeURIComponent(ip)}`, {cf:{cacheTtl:60}});
     return await res.json();
 }
+async function fetchMinecraftStatusBatch(ips) {
+    const tasks = ips.map(async (ip) => {
+        try {
+            const data = await fetchMinecraftStatus(ip);
+            return { server: ip, motd: data.motd?.html || "", online: data.online };
+        } catch (error) {
+            return { server: ip, motd: "", online: false, error: error.message || "Request failed" };
+        }
+    });
+    return Promise.all(tasks);
+}
 async function handleInfoRequest(ip) {
-    const d = await fetchMinecraftStatus(ip);
+    const servers = ip.split(",").map((entry) => entry.trim()).filter(Boolean);
+    if (servers.length > 1) {
+        const results = await fetchMinecraftStatusBatch(servers);
+        return new Response(JSON.stringify({ results }), {headers:{'Content-Type':'application/json'}});
+    }
+    const target = servers[0] || ip;
+    const d = await fetchMinecraftStatus(target);
     return new Response(JSON.stringify({motd:d.motd?.html||"", online:d.online}), {headers:{'Content-Type':'application/json'}});
 }
 async function handleGetConfig(env) {
