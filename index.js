@@ -8,6 +8,7 @@ export default {
     }
 
     // 2. API 路由
+    if (url.pathname === '/api/card' && request.method === 'GET') return handleCardImageApi(url, env, request);
     if (url.pathname === '/api/login' && request.method === 'POST') return handleAuthLogin(request, env);
     if (url.pathname === '/api/config') {
         if (request.method === 'GET') return handleGetConfig(env);
@@ -109,6 +110,39 @@ async function handleTelegramWebhook(request, env) {
     } catch (e) {
         return new Response("Error", { status: 200 });
     }
+}
+
+async function handleCardImageApi(url, env, request) {
+    const serverIP = url.searchParams.get("server");
+    if (!serverIP) return new Response("Missing server parameter", { status: 400 });
+
+    const format = (url.searchParams.get("format") || "svg").toLowerCase();
+    if (format === "png") {
+        try {
+            const data = await fetchMinecraftStatus(serverIP);
+            const { height } = computeCardMetrics(serverIP, data);
+            const workerUrl = new URL(request.url).origin;
+            const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
+            const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
+            const microlinkRes = await fetch(screenshotUrl);
+            if (!microlinkRes.ok) return new Response("Failed to generate screenshot", { status: 502 });
+            const microlinkData = await microlinkRes.json();
+            const imageUrl = microlinkData?.data?.screenshot?.url;
+            if (!imageUrl) return new Response("Screenshot URL missing", { status: 502 });
+            const imageRes = await fetch(imageUrl);
+            if (!imageRes.ok) return new Response("Failed to fetch screenshot", { status: 502 });
+            return new Response(imageRes.body, {
+                headers: {
+                    "Content-Type": "image/png",
+                    "Cache-Control": "no-cache"
+                }
+            });
+        } catch (error) {
+            return new Response("Error", { status: 500 });
+        }
+    }
+
+    return handleImageRequest(serverIP, env);
 }
 
 async function sendTelegramMessage(token, chatId, text, parseMode) {
