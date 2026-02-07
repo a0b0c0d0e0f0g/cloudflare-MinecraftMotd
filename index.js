@@ -9,7 +9,6 @@ export default {
 
     // 2. API 路由
     if (url.pathname === '/api/card' && request.method === 'GET') return handleCardImageApi(url, env, request);
-    if (url.pathname.startsWith('/api/card/') && request.method === 'GET') return handleCardImageApi(url, env, request);
     if (url.pathname === '/api/login' && request.method === 'POST') return handleAuthLogin(request, env);
     if (url.pathname === '/api/config') {
         if (request.method === 'GET') return handleGetConfig(env);
@@ -114,24 +113,10 @@ async function handleTelegramWebhook(request, env) {
 }
 
 async function handleCardImageApi(url, env, request) {
-    let serverIP = url.searchParams.get("server");
-    let format = (url.searchParams.get("format") || "svg").toLowerCase();
-    if (!serverIP && url.pathname.startsWith("/api/card/")) {
-        const suffix = url.pathname.slice("/api/card/".length);
-        const cleanSuffix = suffix.replace(/^\/+/, "");
-        if (cleanSuffix.toLowerCase().endsWith(".png")) {
-            format = "png";
-            serverIP = cleanSuffix.slice(0, -4);
-        } else if (cleanSuffix.toLowerCase().endsWith(".svg")) {
-            format = "svg";
-            serverIP = cleanSuffix.slice(0, -4);
-        } else {
-            serverIP = cleanSuffix;
-        }
-        serverIP = decodeURIComponent(serverIP || "");
-    }
+    const serverIP = url.searchParams.get("server");
     if (!serverIP) return new Response("Missing server parameter", { status: 400 });
 
+    const format = (url.searchParams.get("format") || "svg").toLowerCase();
     if (format === "png") {
         try {
             const data = await fetchMinecraftStatus(serverIP);
@@ -146,8 +131,7 @@ async function handleCardImageApi(url, env, request) {
             if (!imageUrl) return new Response("Screenshot URL missing", { status: 502 });
             const imageRes = await fetch(imageUrl);
             if (!imageRes.ok) return new Response("Failed to fetch screenshot", { status: 502 });
-            const imageBuffer = await imageRes.arrayBuffer();
-            return new Response(imageBuffer, {
+            return new Response(imageRes.body, {
                 headers: {
                     "Content-Type": "image/png",
                     "Cache-Control": "no-cache"
