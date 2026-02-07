@@ -93,9 +93,9 @@ async function handleTelegramWebhook(request, env) {
                     try {
                         // Microlink 截图高度来自计算出的卡片布局高度，确保图片与 SVG 一致，减少空白。
                         const workerUrl = new URL(request.url).origin;
+                        const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
                         const { height } = computeCardMetrics(serverIP, data);
-                        const cardUrl = buildCardUrl(workerUrl, serverIP);
-                        const screenshotUrl = await resolveScreenshotUrl(cardUrl, height);
+                        const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
                         
                         await sendTelegramPhoto(token, chatId, screenshotUrl, textCaption);
                     } catch (imgError) {
@@ -122,8 +122,13 @@ async function handleCardImageApi(url, env, request) {
             const data = await fetchMinecraftStatus(serverIP);
             const { height } = computeCardMetrics(serverIP, data);
             const workerUrl = new URL(request.url).origin;
-            const cardUrl = buildCardUrl(workerUrl, serverIP);
-            const imageUrl = await resolveScreenshotUrl(cardUrl, height);
+            const cardUrl = `${workerUrl}/?type=card&server=${encodeURIComponent(serverIP)}`;
+            const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
+            const microlinkRes = await fetch(screenshotUrl);
+            if (!microlinkRes.ok) return new Response("Failed to generate screenshot", { status: 502 });
+            const microlinkData = await microlinkRes.json();
+            const imageUrl = microlinkData?.data?.screenshot?.url;
+            if (!imageUrl) return new Response("Screenshot URL missing", { status: 502 });
             const imageRes = await fetch(imageUrl);
             if (!imageRes.ok) return new Response("Failed to fetch screenshot", { status: 502 });
             return new Response(imageRes.body, {
@@ -359,33 +364,6 @@ function computeCardMetricsFromLayout(statsY, ipY, playerCount) {
     const playerAreaHeight = Math.max((playerCount || 1) * 22, 30);
     const height = headerHeight + 85 + 35 + playerAreaHeight + 45;
     return { headerHeight, playerAreaHeight, height };
-}
-
-function buildCardUrl(origin, serverIP) {
-    return `${origin}/?type=card&server=${encodeURIComponent(serverIP)}`;
-}
-
-function buildMicrolinkUrl(cardUrl, height) {
-    return `https://api.microlink.io/?url=${encodeURIComponent(cardUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=460&viewport.height=${height}&viewport.deviceScaleFactor=2&t=${Date.now()}`;
-}
-
-function buildFallbackScreenshotUrl(cardUrl) {
-    return `https://s.wordpress.com/mshots/v1/${encodeURIComponent(cardUrl)}?w=460`;
-}
-
-async function resolveScreenshotUrl(cardUrl, height) {
-    try {
-        const microlinkRes = await fetch(buildMicrolinkUrl(cardUrl, height), {
-            headers: { "Accept": "application/json" }
-        });
-        if (!microlinkRes.ok) throw new Error(`Microlink error: ${microlinkRes.status}`);
-        const microlinkData = await microlinkRes.json();
-        const imageUrl = microlinkData?.data?.screenshot?.url;
-        if (!imageUrl) throw new Error("Microlink screenshot missing");
-        return imageUrl;
-    } catch (error) {
-        return buildFallbackScreenshotUrl(cardUrl);
-    }
 }
 
 // --- 主页 HTML (大字体 + 紧凑输入框) ---
