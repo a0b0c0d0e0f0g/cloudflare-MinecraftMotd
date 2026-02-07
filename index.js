@@ -58,7 +58,7 @@ async function handleTelegramWebhook(request, env) {
             if (text.startsWith(statusCmd + " ")) serverIP = text.substring(statusCmd.length + 1).trim();
             else if (text === statusCmd) {
                 const escapedCmd = statusCmd.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-                await sendTelegramMessage(token, chatId, `请使用: \`${escapedCmd} <IP>\``, "MarkdownV2");
+                await sendTelegramMessage(token, chatId, `请使用: \`${escapedCmd} <URL>\``, "MarkdownV2");
                 return new Response("OK");
             }
 
